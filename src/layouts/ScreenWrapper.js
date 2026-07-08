@@ -17,6 +17,7 @@ const ScreenWrapper = ({
   padded = true,
   className = '',
   contentClassName = '',
+  footer = null,
 }) => {
   const paddingClass = padded ? 'px-5 pb-6' : '';
 
@@ -35,6 +36,10 @@ const ScreenWrapper = ({
         ) : (
           <View className={`flex-1 ${paddingClass} ${contentClassName}`}>{children}</View>
         )}
+        {/* Rendered outside the padded content area since BottomButton (and
+            similar fixed CTAs) manage their own horizontal padding and
+            safe-area bottom inset. */}
+        {footer}
       </SafeAreaView>
     </ImageBackground>
   );

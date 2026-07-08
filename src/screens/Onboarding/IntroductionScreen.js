@@ -33,7 +33,7 @@ const IntroductionScreen = () => {
   };
 
   return (
-    <ScreenWrapper padded={false}>
+    <ScreenWrapper padded={false} footer={<BottomButton label="Continue" onPress={handleContinue} loading={isSubmitting} />}>
       <View className="px-5 pt-2">
         <Header title="The 12 Core Emotions" subtitle="Momentum helps you track and reflect on these together." />
         <Text className="mb-4 text-sm leading-5 text-textSecondary">
@@ -46,14 +46,13 @@ const IntroductionScreen = () => {
         data={EMOTIONS}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        className="flex-1"
         contentContainerClassName="px-5 pb-4"
         showsVerticalScrollIndicator={false}
         initialNumToRender={8}
         windowSize={7}
         removeClippedSubviews
       />
-
-      <BottomButton label="Continue" onPress={handleContinue} loading={isSubmitting} />
     </ScreenWrapper>
   );
 };
