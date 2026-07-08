@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
+import Icon from './Icon';
+import { ICONS } from '../constants/icons';
 import { COLORS } from '../styles/colors';
 
 /**
@@ -42,7 +44,7 @@ const VoicePlayer = ({ source, label = 'Play prompt', autoPlay = false }) => {
         accessibilityRole="button"
         accessibilityLabel={isPlaying ? 'Pause voice prompt' : `Play voice prompt: ${label}`}
         className="h-11 w-11 items-center justify-center rounded-full bg-primary">
-        <Text className="text-base text-white">{isPlaying ? '❚❚' : '▶'}</Text>
+        <Icon name={isPlaying ? ICONS.PAUSE : ICONS.PLAY} size={18} color={COLORS.white} />
       </TouchableOpacity>
       <View className="ml-3 flex-1">
         <Text className="text-sm font-medium text-text" numberOfLines={1}>

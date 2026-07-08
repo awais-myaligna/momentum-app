@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import BottomButton from '../../components/BottomButton';
+import Icon from '../../components/Icon';
 import ProgressBar from '../../components/ProgressBar';
 import ScoreSlider from '../../components/ScoreSlider';
 import { useAssessment } from '../../context/AssessmentContext';
@@ -9,6 +10,7 @@ import { useToast } from '../../context/ToastContext';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { ASSESSMENT_ROUTES } from '../../navigation/routes';
 import { submitAssessment } from '../../services/emotionService';
+import { COLORS } from '../../styles/colors';
 
 const EmotionRatingScreen = ({ navigation }) => {
   const {
@@ -69,9 +71,10 @@ const EmotionRatingScreen = ({ navigation }) => {
         <ProgressBar progress={progress} />
       </View>
 
-      <Text className="mb-1 text-2xl font-bold text-text">
-        {currentEmotion.icon} Rate {currentEmotion.name}
-      </Text>
+      <View className="mb-1 flex-row items-center">
+        <Icon name={currentEmotion.icon} size={22} color={COLORS.primary} />
+        <Text className="ml-2 text-2xl font-bold text-text">Rate {currentEmotion.name}</Text>
+      </View>
       <Text className="mb-8 text-sm text-textSecondary">
         On a scale of 1 to 10, where 1 is very low and 10 is very high.
       </Text>

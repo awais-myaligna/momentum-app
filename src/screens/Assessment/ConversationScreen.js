@@ -1,12 +1,14 @@
 import { Text, View } from 'react-native';
 
 import BottomButton from '../../components/BottomButton';
+import Icon from '../../components/Icon';
 import ProgressBar from '../../components/ProgressBar';
 import QuestionCard from '../../components/QuestionCard';
 import { useAssessment } from '../../context/AssessmentContext';
 import { BASELINE_QUESTIONS } from '../../data/questions';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { ASSESSMENT_ROUTES } from '../../navigation/routes';
+import { COLORS } from '../../styles/colors';
 
 // The conversational, AI-guided question for the current emotion in the
 // Emotional Compass Check-in (roadmap section 5). Voice prompts are
@@ -25,7 +27,10 @@ const ConversationScreen = ({ navigation }) => {
         <ProgressBar progress={progress} />
       </View>
 
-      <Text className="mb-1 text-2xl font-bold text-text">{currentEmotion.icon} Let&apos;s check in</Text>
+      <View className="mb-1 flex-row items-center">
+        <Icon name={currentEmotion.icon} size={22} color={COLORS.primary} />
+        <Text className="ml-2 text-2xl font-bold text-text">Let&apos;s check in</Text>
+      </View>
       <Text className="mb-6 text-sm text-textSecondary">
         Take a moment to reflect. There are no right or wrong answers.
       </Text>

@@ -4,13 +4,17 @@ import { FlatList, Text, View } from 'react-native';
 import BottomButton from '../../components/BottomButton';
 import Card from '../../components/Card';
 import Header from '../../components/Header';
+import Icon from '../../components/Icon';
 import { useAuth } from '../../context/AuthContext';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
+import { COLORS } from '../../styles/colors';
 import { EMOTIONS } from '../../data/emotions';
 
 const EmotionListItem = memo(({ emotion }) => (
   <Card className="mb-3 flex-row items-start" shadow={false}>
-    <Text className="mr-3 text-2xl">{emotion.icon}</Text>
+    <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-background">
+      <Icon name={emotion.icon} size={18} color={COLORS.primary} />
+    </View>
     <View className="flex-1">
       <Text className="text-base font-semibold text-text">{emotion.name}</Text>
       <Text className="mt-0.5 text-sm leading-5 text-textSecondary">{emotion.description}</Text>

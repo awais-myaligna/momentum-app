@@ -2,10 +2,13 @@ import { Text, View } from 'react-native';
 
 import BottomButton from '../../components/BottomButton';
 import Card from '../../components/Card';
+import Icon from '../../components/Icon';
+import { ICONS } from '../../constants/icons';
 import { DAILY_CHECKIN_GROUPS } from '../../data/dailyCheckInSchedule';
 import { getEmotionById } from '../../data/emotions';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { ASSESSMENT_ROUTES } from '../../navigation/routes';
+import { COLORS } from '../../styles/colors';
 
 const DAY_LABELS = ['Day 1', 'Day 2', 'Day 3'];
 
@@ -18,7 +21,7 @@ const EmotionalRoadmapScreen = ({ navigation }) => {
       scroll
       footer={<BottomButton label="Continue" onPress={() => navigation.navigate(ASSESSMENT_ROUTES.COMPLETE)} />}>
       <View className="mt-4 mb-6 items-center">
-        <Text className="text-5xl">🗺️</Text>
+        <Icon name={ICONS.ROADMAP} size={56} color={COLORS.primary} />
         <Text className="mt-4 text-center text-2xl font-bold text-text">Your Emotional Roadmap</Text>
         <Text className="mt-3 text-center text-sm leading-5 text-textSecondary">
           Just like a GPS, Momentum gives you a starting point, your baseline, and helps you navigate your emotional
@@ -40,8 +43,8 @@ const EmotionalRoadmapScreen = ({ navigation }) => {
               const emotion = getEmotionById(emotionId);
               return (
                 <View key={emotionId} className="mb-2 mr-2 flex-row items-center rounded-full bg-gray100 px-3 py-1.5">
-                  <Text className="mr-1">{emotion.icon}</Text>
-                  <Text className="text-xs font-medium text-text">{emotion.name}</Text>
+                  <Icon name={emotion.icon} size={14} color={COLORS.primary} />
+                  <Text className="ml-1 text-xs font-medium text-text">{emotion.name}</Text>
                 </View>
               );
             })}

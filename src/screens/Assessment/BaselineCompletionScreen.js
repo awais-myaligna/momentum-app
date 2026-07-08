@@ -6,12 +6,15 @@ import Button from '../../components/Button';
 import ChartCard from '../../components/ChartCard';
 import EmotionBarChart from '../../components/EmotionBarChart';
 import EmptyState from '../../components/EmptyState';
+import Icon from '../../components/Icon';
 import Loading from '../../components/Loading';
 import Modal from '../../components/Modal';
 import { useAssessment } from '../../context/AssessmentContext';
+import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { ASSESSMENT_ROUTES } from '../../navigation/routes';
 import { getDashboard } from '../../services/dashboardService';
+import { COLORS } from '../../styles/colors';
 
 const CHART_EXPLANATION =
   'This baseline chart is only a starting point. Lower scores are not something to fear or feel bad about — they simply show where you may benefit from more awareness, attention, or support. As you keep checking in, this picture will grow richer and more accurate.';
@@ -49,7 +52,7 @@ const BaselineCompletionScreen = ({ navigation }) => {
       scroll
       footer={<BottomButton label="Continue" onPress={() => navigation.navigate(ASSESSMENT_ROUTES.ROADMAP)} />}>
       <View className="mt-4 mb-6 items-center">
-        <Text className="text-5xl">🎉</Text>
+        <Icon name={ICONS.CELEBRATION} size={56} color={COLORS.primary} />
         <Text className="mt-4 text-center text-2xl font-bold text-text">
           Congratulations! You&apos;ve successfully begun your progress chart.
         </Text>
@@ -60,7 +63,7 @@ const BaselineCompletionScreen = ({ navigation }) => {
           <Loading skeleton skeletonRows={4} />
         ) : hasError ? (
           <EmptyState
-            icon="⚠️"
+            icon={ICONS.ERROR}
             title="Couldn't load your chart"
             description="Something went wrong loading your results."
             actionLabel="Retry"

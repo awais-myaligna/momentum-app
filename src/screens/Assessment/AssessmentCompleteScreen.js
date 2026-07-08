@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import BottomButton from '../../components/BottomButton';
+import Icon from '../../components/Icon';
 import { useAuth } from '../../context/AuthContext';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
+import { ICONS } from '../../constants/icons';
+import { COLORS } from '../../styles/colors';
 
 // Final screen of the baseline flow (roadmap section 14). Continuing here
 // calls AuthContext.completeBaseline(), which is what flips RootNavigator
@@ -20,7 +23,7 @@ const AssessmentCompleteScreen = () => {
   return (
     <ScreenWrapper footer={<BottomButton label="Go to My Dashboard" onPress={handleDone} loading={isFinishing} />}>
       <View className="flex-1 items-center justify-center">
-        <Text className="text-5xl">✅</Text>
+        <Icon name={ICONS.COMPLETE} size={56} color={COLORS.success} />
         <Text className="mt-4 text-center text-2xl font-bold text-text">You&apos;re All Set</Text>
         <Text className="mt-3 text-center text-base leading-6 text-textSecondary">
           Thank you! We&apos;ll check in again tomorrow, or at your next session, to begin your daily reflections.

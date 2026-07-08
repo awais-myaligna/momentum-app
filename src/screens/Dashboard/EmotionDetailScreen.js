@@ -1,20 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 
 import BottomButton from '../../components/BottomButton';
 import Card from '../../components/Card';
 import EmptyState from '../../components/EmptyState';
 import Header from '../../components/Header';
+import Icon from '../../components/Icon';
 import Loading from '../../components/Loading';
+import { ICONS } from '../../constants/icons';
 import { EMOTIONS } from '../../data/emotions';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { ASSESSMENT_ROUTES } from '../../navigation/routes';
 import { getEmotionDetails } from '../../services/emotionService';
+import { COLORS } from '../../styles/colors';
 
 const BAND_TEXT_CLASS = {
   danger: 'text-danger',
   warning: 'text-warning',
   success: 'text-success',
+};
+
+const BAND_BG_CLASS = {
+  danger: 'bg-danger/10',
+  warning: 'bg-warning/10',
+  success: 'bg-success/10',
+};
+
+const BAND_ICON_COLOR = {
+  danger: COLORS.danger,
+  warning: COLORS.warning,
+  success: COLORS.success,
 };
 
 /**
@@ -67,7 +82,7 @@ const EmotionDetailScreen = ({ route, navigation }) => {
         <Loading skeleton skeletonRows={5} />
       ) : hasError || !detail ? (
         <EmptyState
-          icon="⚠️"
+          icon={ICONS.ERROR}
           title="Couldn't load this emotion"
           description="Something went wrong loading these details."
           actionLabel="Retry"
@@ -76,7 +91,9 @@ const EmotionDetailScreen = ({ route, navigation }) => {
       ) : (
         <>
           <Card className="mb-4 items-center py-6">
-            <Text className="text-5xl">{detail.icon}</Text>
+            <View className={`h-16 w-16 items-center justify-center rounded-full ${BAND_BG_CLASS[detail.band]}`}>
+              <Icon name={detail.icon} size={30} color={BAND_ICON_COLOR[detail.band]} />
+            </View>
             <Text className="mt-3 text-2xl font-bold text-text">{detail.name}</Text>
             <Text className={`mt-1 text-4xl font-bold ${BAND_TEXT_CLASS[detail.band]}`}>{detail.score}/10</Text>
             <Text className="mt-1 text-sm font-medium text-textSecondary">{detail.bandLabel}</Text>
