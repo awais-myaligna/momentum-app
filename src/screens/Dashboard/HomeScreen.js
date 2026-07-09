@@ -76,7 +76,9 @@ const HomeScreen = ({ navigation }) => {
           <View className="mb-5 mt-2 flex-row items-center justify-between">
             <View>
               <Text className="text-sm text-textSecondary">Welcome back,</Text>
-              <Text className="text-2xl font-bold text-text">{profile?.name?.split(' ')[0] ?? 'there'}</Text>
+              <Text className="text-2xl font-bold text-text">
+                {profile?.name?.split(' ')[0] ?? 'there'}
+              </Text>
             </View>
             <Avatar name={profile?.name} size="md" />
           </View>
@@ -84,12 +86,16 @@ const HomeScreen = ({ navigation }) => {
           <Card className="mb-4">
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
-                <Text className="text-sm font-medium text-textSecondary">Day {dashboard.currentDay}</Text>
+                <Text className="text-sm font-medium text-textSecondary">
+                  Day {dashboard.currentDay}
+                </Text>
                 <Text className={`mt-1 text-4xl font-bold ${BAND_TEXT_CLASS[averageBand.color]}`}>
                   {dashboard.averageScore}
                   <Text className="text-lg text-textSecondary">/10</Text>
                 </Text>
-                <Text className="mt-1 text-xs font-medium text-textSecondary">Average emotional alignment</Text>
+                <Text className="mt-1 text-xs font-medium text-textSecondary">
+                  Average emotional alignment
+                </Text>
                 <ProgressBar
                   progress={dashboard.averageScore / 10}
                   color={averageBand.color}
@@ -112,7 +118,9 @@ const HomeScreen = ({ navigation }) => {
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-semibold text-text">View Your Chart</Text>
-                  <Text className="text-xs text-textSecondary">See all 12 emotions, color-coded</Text>
+                  <Text className="text-xs text-textSecondary">
+                    See all 12 emotions, color-coded
+                  </Text>
                 </View>
               </View>
               <Icon name={ICONS.CHEVRON_RIGHT} size={16} color={COLORS.gray400} />

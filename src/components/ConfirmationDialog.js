@@ -13,17 +13,26 @@ const ConfirmationDialog = ({
   onConfirm,
   onCancel,
   destructive = false,
+  loading = false,
 }) => {
   return (
-    <Modal visible={visible} onClose={onCancel}>
+    <Modal
+      visible={visible}
+      onClose={loading ? undefined : onCancel}
+      dismissOnBackdropPress={!loading}>
       <Text className="mb-2 text-lg font-bold text-text">{title}</Text>
       {message ? <Text className="mb-5 text-sm text-textSecondary">{message}</Text> : null}
       <View className="flex-row">
         <View className="mr-2 flex-1">
-          <Button label={cancelLabel} onPress={onCancel} variant="ghost" />
+          <Button label={cancelLabel} onPress={onCancel} variant="ghost" disabled={loading} />
         </View>
         <View className="ml-2 flex-1">
-          <Button label={confirmLabel} onPress={onConfirm} variant={destructive ? 'danger' : 'primary'} />
+          <Button
+            label={confirmLabel}
+            onPress={onConfirm}
+            variant={destructive ? 'danger' : 'primary'}
+            loading={loading}
+          />
         </View>
       </View>
     </Modal>
