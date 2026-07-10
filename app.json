@@ -3,6 +3,7 @@
     "name": "Momentum",
     "slug": "momentum",
     "version": "1.0.0",
+    "scheme": "momentum",
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -15,7 +16,10 @@
         }
       ],
       "expo-secure-store",
-      "expo-audio"
+      "expo-audio",
+      "@config-plugins/react-native-webrtc",
+      "@livekit/react-native-expo-plugin",
+      "expo-font"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,12 +28,33 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.momentum.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Momentum uses the microphone during voice check-ins so you can talk through how you're feeling."
+      },
+      "bitcode": false
     },
     "android": {
+      "package": "com.momentum.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH",
+        "android.permission.CAMERA",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "147559af-40b7-4fb6-82a9-a5c4ae8226a2"
       }
     }
   }
