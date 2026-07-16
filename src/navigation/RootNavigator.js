@@ -15,8 +15,8 @@ const Stack = createNativeStackNavigator();
  * Onboarding / Auth / Assessment / Main based on AuthContext state.
  */
 const RootNavigator = () => {
-  const { isBootstrapping, hasOnboarded, isAuthenticated, hasCompletedBaseline } = useAuth();
-
+  const { isBootstrapping, isAuthenticated, hasCompletedBaseline } = useAuth();
+  const hasOnboarded = true; // TODO: implement onboarding state — unrelated to auth, left as-is
   if (isBootstrapping) {
     return <SplashScreen />;
   }

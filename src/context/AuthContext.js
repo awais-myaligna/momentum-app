@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { login as loginRequest, logout as logoutRequest, register as registerRequest, getStoredToken } from '../services/authService';
-import { mockStore } from '../mocks/mockStore';
 
 const AuthContext = createContext(null);
 
@@ -28,7 +27,6 @@ export const AuthProvider = ({ children }) => {
 
       setHasOnboarded(onboardedFlag === 'true');
       setIsAuthenticated(Boolean(token));
-      setHasCompletedBaseline(mockStore.hasCompletedBaseline);
       setIsBootstrapping(false);
     };
 
@@ -43,14 +41,14 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (credentials) => {
     const data = await loginRequest(credentials);
     setIsAuthenticated(true);
-    setHasCompletedBaseline(mockStore.hasCompletedBaseline);
+    setHasCompletedBaseline(data.hasCompletedBaseline);
     return data;
   }, []);
 
   const register = useCallback(async (payload) => {
     const data = await registerRequest(payload);
     setIsAuthenticated(true);
-    setHasCompletedBaseline(mockStore.hasCompletedBaseline);
+    setHasCompletedBaseline(data.hasCompletedBaseline);
     return data;
   }, []);
 

@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createApiError, ERROR_TYPES } from '../utils/apiError';
 
 export const AUTH_TOKEN_KEY = 'momentum_auth_token';
-const BASE_URL = 'https://example.com/api';
+const BASE_URL = 'https://api.myaligna.com/api';
 const REQUEST_TIMEOUT = 15000;
 
 const axiosInstance = axios.create({
@@ -13,6 +13,7 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'x-api-key': '12345678',
   },
 });
 
@@ -40,10 +41,10 @@ axiosInstance.interceptors.response.use(
 
     const { status, data } = error.response;
     if (status === 401) {
-      return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, undefined, error));
+      return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, data?.message, error));
     }
     if (status >= 500) {
-      return Promise.reject(createApiError(ERROR_TYPES.SERVER, undefined, error));
+      return Promise.reject(createApiError(ERROR_TYPES.SERVER, data?.message, error));
     }
     return Promise.reject(createApiError(ERROR_TYPES.UNKNOWN, data?.message, error));
   }

@@ -19,7 +19,8 @@
       "expo-audio",
       "@config-plugins/react-native-webrtc",
       "@livekit/react-native-expo-plugin",
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",

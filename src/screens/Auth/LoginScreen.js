@@ -1,94 +1,265 @@
-import { useFormik } from 'formik';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, TouchableOpacity, View } from 'react-native';
-
-import Button from '../../components/Button';
-import Input from '../../components/Input';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  ImageBackground,
+  ScrollView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { AUTH_ROUTES } from '../../navigation/routes';
-import { validationErrorFor } from '../../utils/formHelpers';
-import { loginSchema } from '../../utils/validationSchemas';
+import Icon from '../../components/Icon';
+import { ICONS } from '../../constants/icons';
+import Input from '../../components/Input';
+import Button from '../../components/Button';
 
-const LoginScreen = ({ navigation }) => {
+// Mimicking TopBar
+const TopBar = ({ title, onBack }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
+    <TouchableOpacity onPress={onBack} style={{ padding: 8 }}>
+      <Icon name={ICONS.BACK} size={24} color="#fff" />
+    </TouchableOpacity>
+    <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginLeft: 8 }}>{title}</Text>
+  </View>
+);
+
+// Mimicking FormField
+const FormField = ({ label, value, onChangeText, keyboardType, autoCapitalize, autoComplete, error, secureTextEntry, showToggle }) => (
+  <Input
+    label={label}
+    value={value}
+    onChangeText={onChangeText}
+    keyboardType={keyboardType}
+    autoCapitalize={autoCapitalize}
+    autoComplete={autoComplete}
+    error={error}
+    touched={!!error}
+    secureTextEntry={secureTextEntry}
+    secureToggle={showToggle}
+    className="mb-4"
+  />
+);
+
+// Mimicking PrimaryButton
+const PrimaryButton = ({ title, onPress, loading }) => (
+  <Button
+    label={title}
+    onPress={onPress}
+    loading={loading}
+    className="mt-2 mb-2"
+  />
+);
+
+export default function LoginScreen() {
+  const navigation = useNavigation();
   const { login } = useAuth();
   const { showToast } = useToast();
-  const [submitError, setSubmitError] = useState('');
 
-  const formik = useFormik({
-    initialValues: { email: '', password: '' },
-    validationSchema: loginSchema,
-    onSubmit: async (values) => {
-      setSubmitError('');
-      try {
-        await login(values);
-      } catch (error) {
-        setSubmitError(error?.message || 'Unable to sign in right now.');
-        showToast(error?.message || 'Unable to sign in right now.', { type: 'error' });
-      }
-    },
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passError, setPassError] = useState('');
+  const [apiError, setApiError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleForgotPassword = () => {
-    showToast("Password reset isn't available in this preview yet.", { type: 'info' });
+  const validate = () => {
+    let valid = true;
+    setEmailError('');
+    setPassError('');
+
+    if (!email.trim()) {
+      setEmailError('Email is required.');
+      valid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      setEmailError('Please enter a valid email.');
+      valid = false;
+    }
+    if (!password) {
+      setPassError('Password is required.');
+      valid = false;
+    }
+    return valid;
+  };
+
+  const handleLogin = async () => {
+    if (!validate()) return;
+    setApiError('');
+    setLoading(true);
+    try {
+      const result = await login({ email: email.trim(), password });
+      showToast(result?.message || 'Login successful', { type: 'success' });
+    } catch (err) {
+      const message = err.message || 'Login failed. Please try again.';
+      setApiError(message);
+      showToast(message, { type: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <ScreenWrapper background={require('../../assets/images/auth-background.jpg')} scroll>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View className="mt-16 mb-10">
-          <Text className="text-3xl font-bold text-text">Welcome back</Text>
-          <Text className="mt-1 text-sm text-textSecondary">Sign in to continue your emotional journey.</Text>
-        </View>
+    <ImageBackground
+      source={require('../../assets/images/auth-background.jpg')}
+      style={{ flex: 1 }}
+      resizeMode="cover"
+    >
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            behavior="padding"
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <ScrollView
+              contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View
+                style={{
+                  width: '88%',
+                  height: "90%",
+                  alignSelf: 'center',
+                  marginVertical: 40,
+                  borderRadius: 38,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  padding: 12,
+                }}
+              >
+                <View
+                  className="flex-1 justify-between"
+                  style={{
+                    borderRadius: 30,
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View>
+                    {/* TopBar */}
+                    <TopBar
+                      title="Sign in"
+                      onBack={() => navigation.goBack()}
+                    />
 
-        <Input
-          label="Email"
-          placeholder="you@example.com"
-          value={formik.values.email}
-          onChangeText={formik.handleChange('email')}
-          onBlur={formik.handleBlur('email')}
-          error={validationErrorFor(formik, 'email')}
-          touched={formik.touched.email}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          testID="login-email-input"
-        />
+                    {/* Hero */}
+                    <View className="items-center pt-4 pb-6 px-4">
+                      <Image
+                        source={require('../../../assets/logo.png')}
+                        style={{ width: '100%', height: undefined, aspectRatio: 1.8 }}
+                        resizeMode="contain"
+                      />
+                      <Text
+                        style={{
+                          color: '#fff',
+                          fontSize: 15,
+                          fontWeight: '600',
+                          marginTop: 20,
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        Welcome back
+                      </Text>
+                    </View>
+                  </View>
 
-        <Input
-          label="Password"
-          placeholder="Enter your password"
-          value={formik.values.password}
-          onChangeText={formik.handleChange('password')}
-          onBlur={formik.handleBlur('password')}
-          error={validationErrorFor(formik, 'password')}
-          touched={formik.touched.password}
-          secureTextEntry
-          secureToggle
-          autoCapitalize="none"
-          testID="login-password-input"
-        />
+                  {/* Form panel */}
+                  <View
+                    className="w-full"
+                    style={{
+                      backgroundColor: '#fff',
+                      borderTopLeftRadius: 32,
+                      borderTopRightRadius: 32,
+                      borderBottomLeftRadius: 30,
+                      borderBottomRightRadius: 30,
+                      paddingVertical: 32,
+                      paddingHorizontal: 24,
+                    }}
+                  >
+                    <FormField
+                      label="Email"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      error={emailError}
+                    />
 
-        <TouchableOpacity onPress={handleForgotPassword} className="mb-2 self-end" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text className="text-sm font-medium text-primary">Forgot password?</Text>
-        </TouchableOpacity>
+                    <FormField
+                      label="Password"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      showToggle
+                      autoComplete="password"
+                      error={passError}
+                    />
 
-        {submitError ? <Text className="mb-2 text-center text-sm text-danger">{submitError}</Text> : null}
-      </KeyboardAvoidingView>
+                    <TouchableOpacity
+                      onPress={() => { }}
+                      style={{ alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 }}
+                    >
+                      <Text
+                        className="text-primary"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '600',
+                          textDecorationLine: 'underline',
+                        }}
+                      >
+                        Forgot Password?
+                      </Text>
+                    </TouchableOpacity>
 
-      <View className="mt-6 flex-1 justify-end">
-        <View className="mb-4">
-          <Button label="Sign In" onPress={formik.handleSubmit} loading={formik.isSubmitting} />
-        </View>
-        <View className="flex-row justify-center pb-2">
-          <Text className="text-sm text-textSecondary">Don&apos;t have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text className="text-sm font-semibold text-primary">Sign Up</Text>
-          </TouchableOpacity>
-        </View>
+                    <PrimaryButton
+                      title="Sign in"
+                      onPress={handleLogin}
+                      loading={loading}
+                    />
+
+                    <View className="flex-row justify-center mt-4 gap-1 flex-wrap">
+                      <Text className="text-gray-500 text-xs">
+                        Don&apos;t have an account?
+                      </Text>
+                      <TouchableOpacity onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER)}>
+                        <Text
+                          className="text-primary"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '600',
+                            textDecorationLine: 'underline',
+                          }}
+                        >
+                          Sign up
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {apiError ? (
+                      <Text
+                        style={{
+                          color: '#b00020',
+                          fontSize: 12,
+                          textAlign: 'center',
+                          marginTop: 10,
+                        }}
+                      >
+                        {apiError}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </View>
-    </ScreenWrapper>
+    </ImageBackground>
   );
-};
-
-export default LoginScreen;
+}

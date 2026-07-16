@@ -1,39 +1,66 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { AUTH_TOKEN_KEY } from '../api/axios';
-import { mockStore, resetMockStore } from '../mocks/mockStore';
-import { mockRequest } from '../utils/mockRequest';
+import api, { AUTH_TOKEN_KEY } from '../api/axios';
+
+const normalizeUser = (user, fallback = {}) => ({
+  id: user?.id || fallback.id || '',
+  name: user?.name || user?.full_name || fallback.name || '',
+  email: user?.email || fallback.email || '',
+});
 
 export const login = async ({ email, password }) => {
-  const data = await mockRequest({
-    token: `mock-jwt-${Date.now()}`,
-    user: { id: 'user-1', name: mockStore.profile.name, email },
+  const response = await api.post('/login', { email, password });
+  const data = response?.data;
+
+  if (!data?.user || !data?.token) {
+    throw new Error(response?.message || 'Login response missing user or token.');
+  }
+
+  const normalizedUser = normalizeUser(data.user, {
+    name: data.user?.first_name ? `${data.user.first_name} ${data.user.last_name || ''}`.trim() : '',
+    email: data.user?.email || email,
   });
 
-  mockStore.user = data.user;
-  mockStore.isAuthenticated = true;
   await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
-  return data;
+
+  return {
+    user: normalizedUser,
+    token: data.token,
+    hasCompletedBaseline: Boolean(data.hasCompletedBaseline),
+    message: response?.message,
+  };
 };
 
-export const register = async ({ name, email, password }) => {
-  const data = await mockRequest({
-    token: `mock-jwt-${Date.now()}`,
-    user: { id: 'user-1', name, email },
+export const register = async (payload) => {
+  const response = await api.post('/register', payload);
+  const data = response?.data;
+
+  const token = data?.token || data?.auth?.access_token;
+  if (!data?.user || !token) {
+    throw new Error(response?.message || 'Register response missing user or token.');
+  }
+
+  const normalizedUser = normalizeUser(data.user, {
+    name: payload?.first_name ? `${payload.first_name} ${payload.last_name || ''}`.trim() : payload?.name || '',
+    email: payload?.email || '',
   });
 
-  mockStore.user = data.user;
-  mockStore.profile.name = name;
-  mockStore.profile.email = email;
-  mockStore.isAuthenticated = true;
-  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
-  return data;
+  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+
+  return {
+    user: normalizedUser,
+    token,
+    hasCompletedBaseline: Boolean(data.hasCompletedBaseline),
+    message: response?.message,
+  };
 };
 
 export const logout = async () => {
-  await mockRequest({ success: true }, { delay: 300 });
-  resetMockStore();
-  await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+  try {
+    await api.post('/logout');
+  } finally {
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+  }
   return { success: true };
 };
 
