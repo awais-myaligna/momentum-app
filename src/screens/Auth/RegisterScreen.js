@@ -65,9 +65,9 @@ const DropdownField = ({ label, value, options, onSelect, error }) => {
         <Text className="text-gray-900">{value || `Select ${label}`}</Text>
       </TouchableOpacity>
       {error ? <Text className="mt-1 ml-1 text-xs text-red-500">{error}</Text> : null}
-      
+
       <Modal visible={visible} transparent animationType="fade">
-        <TouchableOpacity 
+        <TouchableOpacity
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
           activeOpacity={1}
           onPress={() => setVisible(false)}
@@ -77,14 +77,14 @@ const DropdownField = ({ label, value, options, onSelect, error }) => {
               data={options}
               keyExtractor={item => item}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}
                   onPress={() => {
                     onSelect(item);
                     setVisible(false);
                   }}
                 >
-                  <Text style={{ textAlign: 'center', fontSize: 16, color: item === value ? '#B01488' : '#374151', fontWeight: item === value ? 'bold' : 'normal' }}>
+                  <Text className={item === value ? 'text-primary font-bold text-base text-center' : 'text-gray-700 font-normal text-base text-center'}>
                     {item}
                   </Text>
                 </TouchableOpacity>
@@ -120,20 +120,20 @@ const DatePickerField = ({ label, value, onChange, error }) => {
         <Text className="text-gray-900">{value || 'YYYY-MM-DD'}</Text>
       </TouchableOpacity>
       {error ? <Text className="mt-1 ml-1 text-xs text-red-500">{error}</Text> : null}
-      
+
       {show && (
         Platform.OS === 'ios' ? (
           <Modal transparent animationType="fade">
-            <TouchableOpacity 
+            <TouchableOpacity
               style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
               activeOpacity={1}
               onPress={() => setShow(false)}
             >
               <View style={{ backgroundColor: 'white', paddingBottom: 20 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 16 }}>
-                   <TouchableOpacity onPress={() => setShow(false)}>
-                     <Text style={{ color: '#B01488', fontWeight: 'bold', fontSize: 16 }}>Done</Text>
-                   </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShow(false)}>
+                    <Text className="text-primary font-bold text-base">Done</Text>
+                  </TouchableOpacity>
                 </View>
                 <DateTimePicker
                   value={value ? new Date(value) : new Date()}
@@ -233,10 +233,14 @@ const RegisterScreen = () => {
   };
 
   return (
-    <ImageBackground source={require('../../assets/images/auth-background.jpg')} style={{ flex: 1 }} resizeMode="cover">
+    <ImageBackground source={require('../../assets/images/background.png')} style={{ flex: 1 }} resizeMode="cover">
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' }}>
         <SafeAreaView style={{ flex: 1 }}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+          >
             <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View
                 style={{
@@ -295,24 +299,15 @@ const RegisterScreen = () => {
 
                     <TouchableOpacity onPress={() => setAgreeTerms((value) => !value)} className="mb-3 flex-row items-start">
                       <View
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 4,
-                          borderWidth: 2,
-                          borderColor: agreeTerms ? '#B01488' : '#9CA3AF',
-                          backgroundColor: agreeTerms ? '#B01488' : 'transparent',
-                          marginTop: 2,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                        {agreeTerms ? <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text> : null}
+                        className={`mt-0.5 h-4.5 w-4.5 items-center justify-center rounded border-2 ${agreeTerms ? 'border-primary bg-primary' : 'border-gray-400 bg-transparent'}`}
+                        style={{ width: 18, height: 18, borderRadius: 4, marginTop: 2, alignItems: 'center', justifyContent: 'center' }}>
+                        {agreeTerms ? <Text className="text-white text-[11px] font-bold">✓</Text> : null}
                       </View>
                       <Text className="ml-2 flex-1 text-xs text-gray-600">
                         I agree to the{' '}
-                        <Text style={{ color: '#B01488', fontWeight: '600' }}>Terms</Text>
+                        <Text className="text-primary font-semibold">Terms</Text>
                         {' & '}
-                        <Text style={{ color: '#B01488', fontWeight: '600' }}>Privacy</Text>
+                        <Text className="text-primary font-semibold">Privacy</Text>
                       </Text>
                     </TouchableOpacity>
 
@@ -326,7 +321,7 @@ const RegisterScreen = () => {
                     </View>
 
                     {apiError ? (
-                      <Text style={{ color: '#b00020', fontSize: 12, textAlign: 'center', marginTop: 10 }}>
+                      <Text className="mt-2.5 text-center text-xs text-red-600">
                         {apiError}
                       </Text>
                     ) : null}

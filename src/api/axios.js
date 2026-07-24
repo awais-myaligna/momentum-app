@@ -31,23 +31,23 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (!error.response) {
-      if (error.code === 'ECONNABORTED') {
-        return Promise.reject(createApiError(ERROR_TYPES.TIMEOUT, undefined, error));
-      }
-      return Promise.reject(createApiError(ERROR_TYPES.OFFLINE, undefined, error));
-    }
+  // (error) => {
+  //   if (!error.response) {
+  //     if (error.code === 'ECONNABORTED') {
+  //       return Promise.reject(createApiError(ERROR_TYPES.TIMEOUT, undefined, error));
+  //     }
+  //     return Promise.reject(createApiError(ERROR_TYPES.OFFLINE, undefined, error));
+  //   }
 
-    const { status, data } = error.response;
-    if (status === 401) {
-      return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, data?.message, error));
-    }
-    if (status >= 500) {
-      return Promise.reject(createApiError(ERROR_TYPES.SERVER, data?.message, error));
-    }
-    return Promise.reject(createApiError(ERROR_TYPES.UNKNOWN, data?.message, error));
-  }
+  //   const { status, data } = error.response;
+  //   if (status === 401) {
+  //     return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, data?.message, error));
+  //   }
+  //   if (status >= 500) {
+  //     return Promise.reject(createApiError(ERROR_TYPES.SERVER, data?.message, error));
+  //   }
+  //   return Promise.reject(createApiError(ERROR_TYPES.UNKNOWN, data?.message, error));
+  // }
 );
 
 export default axiosInstance;

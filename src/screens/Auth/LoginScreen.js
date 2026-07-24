@@ -105,16 +105,16 @@ export default function LoginScreen() {
 
   return (
     <ImageBackground
-      source={require('../../assets/images/auth-background.jpg')}
+      source={require('../../assets/images/background.png')}
       style={{ flex: 1 }}
       resizeMode="cover"
     >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' }}>
         <SafeAreaView style={{ flex: 1 }}>
           <KeyboardAvoidingView
-            behavior="padding"
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
           >
             <ScrollView
               contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
@@ -242,14 +242,7 @@ export default function LoginScreen() {
                     </View>
 
                     {apiError ? (
-                      <Text
-                        style={{
-                          color: '#b00020',
-                          fontSize: 12,
-                          textAlign: 'center',
-                          marginTop: 10,
-                        }}
-                      >
+                      <Text className="mt-2.5 text-center text-xs text-red-600">
                         {apiError}
                       </Text>
                     ) : null}

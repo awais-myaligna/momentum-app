@@ -10,37 +10,36 @@ const normalizeUser = (user, fallback = {}) => ({
 
 export const login = async ({ email, password }) => {
   const response = await api.post('/login', { email, password });
-  const data = response?.data;
+  const { user, token } = response || {};
 
-  if (!data?.user || !data?.token) {
+  if (!user || !token) {
     throw new Error(response?.message || 'Login response missing user or token.');
   }
 
-  const normalizedUser = normalizeUser(data.user, {
-    name: data.user?.first_name ? `${data.user.first_name} ${data.user.last_name || ''}`.trim() : '',
-    email: data.user?.email || email,
+  const normalizedUser = normalizeUser(user, {
+    name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
+    email: user?.email || email,
   });
 
-  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
+  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
   return {
     user: normalizedUser,
-    token: data.token,
-    hasCompletedBaseline: Boolean(data.hasCompletedBaseline),
+    token,
+    hasCompletedBaseline: Boolean(user?.hasCompletedBaseline),
     message: response?.message,
   };
 };
 
 export const register = async (payload) => {
   const response = await api.post('/register', payload);
-  const data = response?.data;
+  const { user, token } = response || {};
 
-  const token = data?.token || data?.auth?.access_token;
-  if (!data?.user || !token) {
+  if (!user || !token) {
     throw new Error(response?.message || 'Register response missing user or token.');
   }
 
-  const normalizedUser = normalizeUser(data.user, {
+  const normalizedUser = normalizeUser(user, {
     name: payload?.first_name ? `${payload.first_name} ${payload.last_name || ''}`.trim() : payload?.name || '',
     email: payload?.email || '',
   });
@@ -50,7 +49,7 @@ export const register = async (payload) => {
   return {
     user: normalizedUser,
     token,
-    hasCompletedBaseline: Boolean(data.hasCompletedBaseline),
+    hasCompletedBaseline: Boolean(user?.hasCompletedBaseline),
     message: response?.message,
   };
 };
