@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { AUTH_ROUTES } from '../../navigation/routes';
+import { sendOtp } from '../../services/authService';
 import Icon from '../../components/Icon';
 import { ICONS } from '../../constants/icons';
 import Input from '../../components/Input';
@@ -30,7 +30,7 @@ const TopBar = ({ title, onBack }) => (
 );
 
 // Mimicking FormField
-const FormField = ({ label, value, onChangeText, keyboardType, autoCapitalize, autoComplete, error, secureTextEntry, showToggle }) => (
+const FormField = ({ label, value, onChangeText, keyboardType, autoCapitalize, autoComplete, error }) => (
   <Input
     label={label}
     value={value}
@@ -40,8 +40,6 @@ const FormField = ({ label, value, onChangeText, keyboardType, autoCapitalize, a
     autoComplete={autoComplete}
     error={error}
     touched={!!error}
-    secureTextEntry={secureTextEntry}
-    secureToggle={showToggle}
     className="mb-4"
   />
 );
@@ -56,46 +54,42 @@ const PrimaryButton = ({ title, onPress, loading }) => (
   />
 );
 
-export default function LoginScreen() {
+const getErrorMessage = (err, fallback) => err?.response?.data?.message || err?.message || fallback;
+
+export default function ForgotPasswordScreen() {
   const navigation = useNavigation();
-  const { login } = useAuth();
   const { showToast } = useToast();
 
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
-  const [passError, setPassError] = useState('');
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const validate = () => {
-    let valid = true;
     setEmailError('');
-    setPassError('');
 
     if (!email.trim()) {
       setEmailError('Email is required.');
-      valid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      return false;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
       setEmailError('Please enter a valid email.');
-      valid = false;
+      return false;
     }
-    if (!password) {
-      setPassError('Password is required.');
-      valid = false;
-    }
-    return valid;
+    return true;
   };
 
-  const handleLogin = async () => {
+  const handleContinue = async () => {
     if (!validate()) return;
     setApiError('');
     setLoading(true);
     try {
-      const result = await login({ email: email.trim(), password });
-      showToast(result?.message || 'Login successful', { type: 'success' });
+      const trimmedEmail = email.trim();
+      const result = await sendOtp({ email: trimmedEmail });
+      showToast(result?.message || 'OTP sent successfully', { type: 'success' });
+      navigation.navigate(AUTH_ROUTES.VERIFY_OTP, { email: trimmedEmail });
     } catch (err) {
-      const message = err.message || 'Login failed. Please try again.';
+      const message = getErrorMessage(err, 'Failed to send OTP. Please try again.');
       setApiError(message);
       showToast(message, { type: 'error' });
     } finally {
@@ -143,7 +137,7 @@ export default function LoginScreen() {
                   <View>
                     {/* TopBar */}
                     <TopBar
-                      title="Sign in"
+                      title="Forgot Password"
                       onBack={() => navigation.goBack()}
                     />
 
@@ -161,9 +155,10 @@ export default function LoginScreen() {
                           fontWeight: '600',
                           marginTop: 20,
                           letterSpacing: 0.5,
+                          textAlign: 'center',
                         }}
                       >
-                        Welcome back
+                        Enter your email and we&apos;ll send you a code to reset your password
                       </Text>
                     </View>
                   </View>
@@ -191,43 +186,17 @@ export default function LoginScreen() {
                       error={emailError}
                     />
 
-                    <FormField
-                      label="Password"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                      showToggle
-                      autoComplete="password"
-                      error={passError}
-                    />
-
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD)}
-                      style={{ alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 }}
-                    >
-                      <Text
-                        className="text-primary"
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '600',
-                          textDecorationLine: 'underline',
-                        }}
-                      >
-                        Forgot Password?
-                      </Text>
-                    </TouchableOpacity>
-
                     <PrimaryButton
-                      title="Sign in"
-                      onPress={handleLogin}
+                      title="Continue"
+                      onPress={handleContinue}
                       loading={loading}
                     />
 
                     <View className="flex-row justify-center mt-4 gap-1 flex-wrap">
                       <Text className="text-gray-500 text-xs">
-                        Don&apos;t have an account?
+                        Remember your password?
                       </Text>
-                      <TouchableOpacity onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER)}>
+                      <TouchableOpacity onPress={() => navigation.navigate(AUTH_ROUTES.LOGIN)}>
                         <Text
                           className="text-primary"
                           style={{
@@ -236,7 +205,7 @@ export default function LoginScreen() {
                             textDecorationLine: 'underline',
                           }}
                         >
-                          Sign up
+                          Sign in
                         </Text>
                       </TouchableOpacity>
                     </View>

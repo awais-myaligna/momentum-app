@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
   Image,
   ImageBackground,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../context/AuthContext';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useToast } from '../../context/ToastContext';
 import { AUTH_ROUTES } from '../../navigation/routes';
+import { sendOtp, verifyOtp } from '../../services/authService';
 import Icon from '../../components/Icon';
 import { ICONS } from '../../constants/icons';
-import Input from '../../components/Input';
 import Button from '../../components/Button';
+
+const OTP_LENGTH = 6;
 
 // Mimicking TopBar
 const TopBar = ({ title, onBack }) => (
@@ -27,23 +29,6 @@ const TopBar = ({ title, onBack }) => (
     </TouchableOpacity>
     <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginLeft: 8 }}>{title}</Text>
   </View>
-);
-
-// Mimicking FormField
-const FormField = ({ label, value, onChangeText, keyboardType, autoCapitalize, autoComplete, error, secureTextEntry, showToggle }) => (
-  <Input
-    label={label}
-    value={value}
-    onChangeText={onChangeText}
-    keyboardType={keyboardType}
-    autoCapitalize={autoCapitalize}
-    autoComplete={autoComplete}
-    error={error}
-    touched={!!error}
-    secureTextEntry={secureTextEntry}
-    secureToggle={showToggle}
-    className="mb-4"
-  />
 );
 
 // Mimicking PrimaryButton
@@ -56,50 +41,97 @@ const PrimaryButton = ({ title, onPress, loading }) => (
   />
 );
 
-export default function LoginScreen() {
-  const navigation = useNavigation();
-  const { login } = useAuth();
-  const { showToast } = useToast();
+const OtpField = ({ digits, onChangeDigit, onKeyPressDigit, error, inputRefs }) => (
+  <View className="mb-4">
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      {digits.map((digit, index) => (
+        <TextInput
+          key={index}
+          ref={(ref) => { inputRefs.current[index] = ref; }}
+          value={digit}
+          onChangeText={(text) => onChangeDigit(index, text)}
+          onKeyPress={(e) => onKeyPressDigit(index, e)}
+          keyboardType="number-pad"
+          maxLength={1}
+          textAlign="center"
+          className={`text-text text-lg font-semibold rounded-xl border bg-white ${error ? 'border-danger' : 'border-border'}`}
+          style={{ width: 44, height: 52 }}
+        />
+      ))}
+    </View>
+    {error ? <Text className="mt-1 text-xs text-danger">{error}</Text> : null}
+  </View>
+);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passError, setPassError] = useState('');
+const getErrorMessage = (err, fallback) => err?.response?.data?.message || err?.message || fallback;
+
+export default function VerifyOtpScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { showToast } = useToast();
+  const email = route.params?.email || '';
+
+  const [digits, setDigits] = useState(Array(OTP_LENGTH).fill(''));
+  const [otpError, setOtpError] = useState('');
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const inputRefs = useRef([]);
 
-  const validate = () => {
-    let valid = true;
-    setEmailError('');
-    setPassError('');
-
-    if (!email.trim()) {
-      setEmailError('Email is required.');
-      valid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      setEmailError('Please enter a valid email.');
-      valid = false;
+  const handleChangeDigit = (index, text) => {
+    const value = text.replace(/[^0-9]/g, '');
+    setDigits((current) => {
+      const next = [...current];
+      next[index] = value.slice(-1);
+      return next;
+    });
+    if (value && index < OTP_LENGTH - 1) {
+      inputRefs.current[index + 1]?.focus();
     }
-    if (!password) {
-      setPassError('Password is required.');
-      valid = false;
-    }
-    return valid;
   };
 
-  const handleLogin = async () => {
-    if (!validate()) return;
+  const handleKeyPressDigit = (index, e) => {
+    if (e.nativeEvent.key === 'Backspace' && !digits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerify = async () => {
+    const otp = digits.join('');
+    setOtpError('');
+
+    if (otp.length !== OTP_LENGTH) {
+      setOtpError(`Please enter the ${OTP_LENGTH}-digit code.`);
+      return;
+    }
+
     setApiError('');
     setLoading(true);
     try {
-      const result = await login({ email: email.trim(), password });
-      showToast(result?.message || 'Login successful', { type: 'success' });
+      const result = await verifyOtp({ email, otp });
+      showToast(result?.message || 'OTP verified successfully', { type: 'success' });
+      navigation.navigate(AUTH_ROUTES.RESET_PASSWORD, { email, resetToken: result.resetToken });
     } catch (err) {
-      const message = err.message || 'Login failed. Please try again.';
+      const message = getErrorMessage(err, 'Invalid OTP. Please try again.');
       setApiError(message);
       showToast(message, { type: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setApiError('');
+    setResending(true);
+    try {
+      const result = await sendOtp({ email });
+      showToast(result?.message || 'OTP sent successfully', { type: 'success' });
+    } catch (err) {
+      const message = getErrorMessage(err, 'Failed to resend OTP. Please try again.');
+      setApiError(message);
+      showToast(message, { type: 'error' });
+    } finally {
+      setResending(false);
     }
   };
 
@@ -143,7 +175,7 @@ export default function LoginScreen() {
                   <View>
                     {/* TopBar */}
                     <TopBar
-                      title="Sign in"
+                      title="Verify OTP"
                       onBack={() => navigation.goBack()}
                     />
 
@@ -161,9 +193,10 @@ export default function LoginScreen() {
                           fontWeight: '600',
                           marginTop: 20,
                           letterSpacing: 0.5,
+                          textAlign: 'center',
                         }}
                       >
-                        Welcome back
+                        Enter the code sent to{'\n'}{email}
                       </Text>
                     </View>
                   </View>
@@ -181,62 +214,35 @@ export default function LoginScreen() {
                       paddingHorizontal: 24,
                     }}
                   >
-                    <FormField
-                      label="Email"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      error={emailError}
+                    <OtpField
+                      digits={digits}
+                      onChangeDigit={handleChangeDigit}
+                      onKeyPressDigit={handleKeyPressDigit}
+                      error={otpError}
+                      inputRefs={inputRefs}
                     />
-
-                    <FormField
-                      label="Password"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                      showToggle
-                      autoComplete="password"
-                      error={passError}
-                    />
-
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD)}
-                      style={{ alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 }}
-                    >
-                      <Text
-                        className="text-primary"
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '600',
-                          textDecorationLine: 'underline',
-                        }}
-                      >
-                        Forgot Password?
-                      </Text>
-                    </TouchableOpacity>
 
                     <PrimaryButton
-                      title="Sign in"
-                      onPress={handleLogin}
+                      title="Verify"
+                      onPress={handleVerify}
                       loading={loading}
                     />
 
                     <View className="flex-row justify-center mt-4 gap-1 flex-wrap">
                       <Text className="text-gray-500 text-xs">
-                        Don&apos;t have an account?
+                        Didn&apos;t receive the code?
                       </Text>
-                      <TouchableOpacity onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER)}>
+                      <TouchableOpacity onPress={handleResend} disabled={resending}>
                         <Text
                           className="text-primary"
                           style={{
                             fontSize: 12,
                             fontWeight: '600',
                             textDecorationLine: 'underline',
+                            opacity: resending ? 0.5 : 1,
                           }}
                         >
-                          Sign up
+                          {resending ? 'Resending...' : 'Resend'}
                         </Text>
                       </TouchableOpacity>
                     </View>

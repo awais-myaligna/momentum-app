@@ -10,10 +10,10 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../context/AuthContext';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useToast } from '../../context/ToastContext';
 import { AUTH_ROUTES } from '../../navigation/routes';
+import { resetPassword } from '../../services/authService';
 import Icon from '../../components/Icon';
 import { ICONS } from '../../constants/icons';
 import Input from '../../components/Input';
@@ -30,18 +30,16 @@ const TopBar = ({ title, onBack }) => (
 );
 
 // Mimicking FormField
-const FormField = ({ label, value, onChangeText, keyboardType, autoCapitalize, autoComplete, error, secureTextEntry, showToggle }) => (
+const FormField = ({ label, value, onChangeText, error, secureTextEntry, showToggle, autoComplete }) => (
   <Input
     label={label}
     value={value}
     onChangeText={onChangeText}
-    keyboardType={keyboardType}
-    autoCapitalize={autoCapitalize}
-    autoComplete={autoComplete}
     error={error}
     touched={!!error}
     secureTextEntry={secureTextEntry}
     secureToggle={showToggle}
+    autoComplete={autoComplete}
     className="mb-4"
   />
 );
@@ -56,46 +54,61 @@ const PrimaryButton = ({ title, onPress, loading }) => (
   />
 );
 
-export default function LoginScreen() {
-  const navigation = useNavigation();
-  const { login } = useAuth();
-  const { showToast } = useToast();
+const getErrorMessage = (err, fallback) => err?.response?.data?.message || err?.message || fallback;
 
-  const [email, setEmail] = useState('');
+export default function ResetPasswordScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { showToast } = useToast();
+  const { email, resetToken } = route.params || {};
+
   const [password, setPassword] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passError, setPassError] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmError, setConfirmError] = useState('');
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const validate = () => {
     let valid = true;
-    setEmailError('');
-    setPassError('');
+    setPasswordError('');
+    setConfirmError('');
 
-    if (!email.trim()) {
-      setEmailError('Email is required.');
+    if (!password) {
+      setPasswordError('Password is required.');
       valid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      setEmailError('Please enter a valid email.');
+    } else if (password.length < 8) {
+      setPasswordError('Password must be at least 8 characters.');
       valid = false;
     }
-    if (!password) {
-      setPassError('Password is required.');
+    if (!confirmPassword) {
+      setConfirmError('Please confirm your password.');
+      valid = false;
+    } else if (password && confirmPassword !== password) {
+      setConfirmError('Passwords do not match.');
       valid = false;
     }
     return valid;
   };
 
-  const handleLogin = async () => {
+  const handleResetPassword = async () => {
     if (!validate()) return;
     setApiError('');
     setLoading(true);
     try {
-      const result = await login({ email: email.trim(), password });
-      showToast(result?.message || 'Login successful', { type: 'success' });
+      const result = await resetPassword({
+        email,
+        token: resetToken,
+        password,
+        password_confirmation: confirmPassword,
+      });
+      showToast(result?.message || 'Password reset successful', { type: 'success' });
+      navigation.reset({
+        index: 0,
+        routes: [{ name: AUTH_ROUTES.LOGIN }],
+      });
     } catch (err) {
-      const message = err.message || 'Login failed. Please try again.';
+      const message = getErrorMessage(err, 'Failed to reset password. Please try again.');
       setApiError(message);
       showToast(message, { type: 'error' });
     } finally {
@@ -143,7 +156,7 @@ export default function LoginScreen() {
                   <View>
                     {/* TopBar */}
                     <TopBar
-                      title="Sign in"
+                      title="Reset Password"
                       onBack={() => navigation.goBack()}
                     />
 
@@ -161,9 +174,10 @@ export default function LoginScreen() {
                           fontWeight: '600',
                           marginTop: 20,
                           letterSpacing: 0.5,
+                          textAlign: 'center',
                         }}
                       >
-                        Welcome back
+                        Create a new password for your account
                       </Text>
                     </View>
                   </View>
@@ -182,64 +196,30 @@ export default function LoginScreen() {
                     }}
                   >
                     <FormField
-                      label="Email"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      error={emailError}
-                    />
-
-                    <FormField
-                      label="Password"
+                      label="New Password"
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry
                       showToggle
                       autoComplete="password"
-                      error={passError}
+                      error={passwordError}
                     />
 
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate(AUTH_ROUTES.FORGOT_PASSWORD)}
-                      style={{ alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 }}
-                    >
-                      <Text
-                        className="text-primary"
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '600',
-                          textDecorationLine: 'underline',
-                        }}
-                      >
-                        Forgot Password?
-                      </Text>
-                    </TouchableOpacity>
+                    <FormField
+                      label="Confirm Password"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry
+                      showToggle
+                      autoComplete="password"
+                      error={confirmError}
+                    />
 
                     <PrimaryButton
-                      title="Sign in"
-                      onPress={handleLogin}
+                      title="Reset Password"
+                      onPress={handleResetPassword}
                       loading={loading}
                     />
-
-                    <View className="flex-row justify-center mt-4 gap-1 flex-wrap">
-                      <Text className="text-gray-500 text-xs">
-                        Don&apos;t have an account?
-                      </Text>
-                      <TouchableOpacity onPress={() => navigation.navigate(AUTH_ROUTES.REGISTER)}>
-                        <Text
-                          className="text-primary"
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '600',
-                            textDecorationLine: 'underline',
-                          }}
-                        >
-                          Sign up
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
 
                     {apiError ? (
                       <Text className="mt-2.5 text-center text-xs text-red-600">

@@ -15,6 +15,9 @@ export const ONBOARDING_ROUTES = {
 export const AUTH_ROUTES = {
   LOGIN: 'Login',
   REGISTER: 'Register',
+  FORGOT_PASSWORD: 'ForgotPassword',
+  VERIFY_OTP: 'VerifyOtp',
+  RESET_PASSWORD: 'ResetPassword',
 };
 
 export const ASSESSMENT_ROUTES = {

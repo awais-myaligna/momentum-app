@@ -54,6 +54,27 @@ export const register = async (payload) => {
   };
 };
 
+export const sendOtp = async ({ email }) => {
+  const response = await api.post('/send-otp', { email });
+  return { message: response?.message };
+};
+
+export const verifyOtp = async ({ email, otp }) => {
+  const response = await api.post('/verify-otp', { email, otp });
+  const resetToken = response?.reset_token;
+
+  if (!resetToken) {
+    throw new Error(response?.message || 'OTP verification response missing reset token.');
+  }
+
+  return { message: response?.message, resetToken };
+};
+
+export const resetPassword = async ({ email, token, password, password_confirmation }) => {
+  const response = await api.post('/reset-password', { email, token, password, password_confirmation });
+  return { message: response?.message };
+};
+
 export const logout = async () => {
   try {
     await api.post('/logout');
