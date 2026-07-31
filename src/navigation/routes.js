@@ -44,6 +44,7 @@ export const HOME_ROUTES = {
 
 export const PROFILE_ROUTES = {
   ROOT: 'ProfileRoot',
+  EDIT: 'EditProfile',
   SETTINGS: 'Settings',
   NOTIFICATIONS: 'Notifications',
   LANGUAGE: 'Language',

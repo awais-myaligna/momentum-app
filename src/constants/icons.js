@@ -20,6 +20,7 @@ export const ICONS = {
   CHECK_IN: 'calendar-outline',
   HISTORY: 'time-outline',
   PROFILE: 'person-outline',
+  EDIT: 'create-outline',
   SETTINGS: 'settings-outline',
   NOTIFICATIONS: 'notifications-outline',
   LANGUAGE: 'globe-outline',

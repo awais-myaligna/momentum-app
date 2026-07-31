@@ -2,6 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 
 import api, { AUTH_TOKEN_KEY } from '../api/axios';
 
+const AUTH_USER_KEY = 'momentum_auth_user';
+
 const normalizeUser = (user, fallback = {}) => ({
   id: user?.id || fallback.id || '',
   name: user?.name || user?.full_name || fallback.name || '',
@@ -22,6 +24,7 @@ export const login = async ({ email, password }) => {
   });
 
   await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+  await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(normalizedUser));
 
   return {
     user: normalizedUser,
@@ -45,6 +48,7 @@ export const register = async (payload) => {
   });
 
   await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+  await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(normalizedUser));
 
   return {
     user: normalizedUser,
@@ -77,11 +81,20 @@ export const resetPassword = async ({ email, token, password, password_confirmat
 
 export const logout = async () => {
   try {
-    await api.post('/logout');
+    // await api.post('/logout');
+    return { message: "Logout api call has been skipped " };
+
   } finally {
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(AUTH_USER_KEY);
   }
-  return { success: true };
 };
 
 export const getStoredToken = () => SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+
+export const getStoredUser = async () => {
+  const raw = await SecureStore.getItemAsync(AUTH_USER_KEY);
+  return raw ? JSON.parse(raw) : null;
+};
+
+export const setStoredUser = (user) => SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));

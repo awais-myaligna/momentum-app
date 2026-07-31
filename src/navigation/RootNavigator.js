@@ -19,6 +19,7 @@ const RootNavigator = () => {
   // const isAuthenticated = false;
   // const hasOnboarded = false; // TODO: implement onboarding state — unrelated to auth, left as-is
   const hasCompletedBaseline = true;
+  // const hasOnboarded = false;
 
   if (isBootstrapping) {
     return <SplashScreen />;

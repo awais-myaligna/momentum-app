@@ -21,7 +21,7 @@ export const ENDPOINTS = {
   },
   HISTORY: '/history',
   PROFILE: {
-    GET: '/profile',
-    UPDATE: '/profile',
+    GET: '/user/profile',
+    UPDATE: '/user/profile',
   },
 };
