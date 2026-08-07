@@ -4,11 +4,32 @@ import api, { AUTH_TOKEN_KEY } from '../api/axios';
 
 const AUTH_USER_KEY = 'momentum_auth_user';
 
-const normalizeUser = (user, fallback = {}) => ({
-  id: user?.id || fallback.id || '',
-  name: user?.name || user?.full_name || fallback.name || '',
-  email: user?.email || fallback.email || '',
-});
+const normalizeUser = (user, fallback = {}) => {
+  const name =
+    user?.name ||
+    user?.full_name ||
+    (user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : '') ||
+    fallback.name ||
+    '';
+
+  const avatar =
+    user?.avatar ||
+    user?.avatar_url ||
+    user?.avatarUrl ||
+    user?.profile_picture ||
+    user?.image ||
+    user?.photo ||
+    fallback.avatar ||
+    null;
+
+  return {
+    ...user,
+    id: user?.id || fallback.id || '',
+    name,
+    email: user?.email || fallback.email || '',
+    avatar,
+  };
+};
 
 export const login = async ({ email, password }) => {
   const response = await api.post('/login', { email, password });
@@ -43,7 +64,9 @@ export const register = async (payload) => {
   }
 
   const normalizedUser = normalizeUser(user, {
-    name: payload?.first_name ? `${payload.first_name} ${payload.last_name || ''}`.trim() : payload?.name || '',
+    name: payload?.first_name
+      ? `${payload.first_name} ${payload.last_name || ''}`.trim()
+      : payload?.name || '',
     email: payload?.email || '',
   });
 
@@ -75,15 +98,19 @@ export const verifyOtp = async ({ email, otp }) => {
 };
 
 export const resetPassword = async ({ email, token, password, password_confirmation }) => {
-  const response = await api.post('/reset-password', { email, token, password, password_confirmation });
+  const response = await api.post('/reset-password', {
+    email,
+    token,
+    password,
+    password_confirmation,
+  });
   return { message: response?.message };
 };
 
 export const logout = async () => {
   try {
     // await api.post('/logout');
-    return { message: "Logout api call has been skipped " };
-
+    return { message: 'Logout api call has been skipped ' };
   } finally {
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(AUTH_USER_KEY);
@@ -97,4 +124,5 @@ export const getStoredUser = async () => {
   return raw ? JSON.parse(raw) : null;
 };
 
-export const setStoredUser = (user) => SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));
+export const setStoredUser = (user) =>
+  SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(user));

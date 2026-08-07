@@ -27,7 +27,7 @@ Either approach is an app-side routing decision — the Instructions/Knowledge B
 
 Copy the entire **Instructions** section of `SYSTEM_PROMPT.md` (everything from "### Agent role" down) into the agent's **System Prompt** field. Do not summarize or shorten it — it encodes required safety behavior (the crisis-language redirect) that must not be dropped.
 
-Confirm the Dynamic Variables it references (`emotionName`, `question`, `checkInType`, `stepPosition`, `previousScore`) are enabled under the agent's **Dynamic Variables** settings so they resolve correctly when the app supplies them at `startSession()`.
+Confirm the Dynamic Variables it references (`emotionId`, `emotionName`, `question`, `checkInType`, `stepPosition`, `previousScore`) are enabled under the agent's **Dynamic Variables** settings so they resolve correctly when the app supplies them at `startSession()`. `emotionId` is the one most worth double-checking — it's what the agent must echo back on `flag_needs_support` calls, and a missing/disabled variable here means the agent never learns the right value.
 
 ## 5. What to Upload Into Knowledge Base
 
@@ -35,14 +35,15 @@ Upload `KNOWLEDGE_BASE.md` as-is under **Knowledge Base → Add Document**. No s
 
 ## 6. Tools to Add
 
-Add both as **Client Tools** (not server/webhook tools — Momentum's backend is never called directly by ElevenLabs):
+Add as a **Client Tool** (not a server/webhook tool — Momentum's backend is never called directly by ElevenLabs):
 
 | Tool name | Parameters |
 |---|---|
-| `record_emotion_score` | `emotionId` (string), `score` (integer, 1–10) |
 | `flag_needs_support` | `emotionId` (string), `reason` (string) |
 
-Full schemas, payloads, and responses are in `TOOLS_AND_APIS.md` — use those definitions verbatim when configuring each tool's parameters in the dashboard. On the app side, implement both by passing a `clientTools` object into `useConversation({ clientTools: { record_emotion_score, flag_needs_support } })` in `ConversationScreen.js`.
+This is the only tool the agent needs. Scoring is **not** a tool call anymore — an earlier design had the agent call a `record_emotion_score` tool mid-conversation, but that proved unreliable to get calling consistently, so scoring moved to an ordinary backend REST call the app makes after the session ends (see `API_DOCUMENTATION.md` §3.9). If your agent config still has `record_emotion_score` registered from that earlier setup, remove it — nothing calls it anymore.
+
+`flag_needs_support`'s full schema, payload, and response are in `TOOLS_AND_APIS.md` §2.2 — use that definition verbatim when configuring the tool's parameters in the dashboard. On the app side it's implemented by passing a `clientTools` object into `useConversation({ clientTools: { flag_needs_support } })` in `ConversationScreen.js`.
 
 ## 7. Recommended Conversation Settings
 
@@ -60,8 +61,8 @@ Full schemas, payloads, and responses are in `TOOLS_AND_APIS.md` — use those d
 - Live transcript arrives via the `onMessage({ message, source })` callback and is rendered in real time; connection state comes from `conversation.status` / `conversation.isSpeaking`.
 - If the agent isn't configured (`EXPO_PUBLIC_AGENT_ID` unset) or a connection error occurs (`onError`), the screen falls back to a plain written question with no voice — the check-in still works, just as text.
 - The app requests microphone access via `expo-audio` (`NSMicrophoneUsageDescription` on iOS, `RECORD_AUDIO` on Android — both already declared in `app.json`).
-- When the agent finishes its closing line, the app calls `conversation.endSession()` and moves straight to the next emotion's screen, which starts an entirely new session. Per the Momentum Roadmap's intended design, the AI assigns the score itself during the conversation (via `record_emotion_score` — see `TOOLS_AND_APIS.md`) — **there is no manual scoring screen in between.** `EmotionRatingScreen`'s current tap-to-select scale is an interim build artifact and should be removed from this flow once the tool is wired in; it should not be treated as a confirmation step.
-- Voice failure needs its own answer to "how does a score get produced," since there's no manual picker to fall back to — see the "Fallback when voice is unavailable" note in `TOOLS_AND_APIS.md` §2.1.
+- When the user taps Continue after the agent's closing line, the app ends the session, sends that emotion's full transcript to `POST /assessment/emotion-score` (`API_DOCUMENTATION.md` §3.9) for AI judging, then moves to the next emotion's screen once the score comes back — **there is no manual scoring screen, and the agent itself never assigns the score.** `EmotionRatingScreen` (the old tap-to-select scale) has been removed from the baseline flow; Continue is disabled with a validation message until the user has actually said something, since an empty transcript can't be judged.
+- Voice failure falls back to a text-chat exchange with the same agent instead of a manual picker — see the "Fallback when voice is unavailable" note in `TOOLS_AND_APIS.md` §2.1. The transcript is captured the same way either way, so scoring afterward is unaffected by which mode produced it.
 
 ## 9. Complete Conversation Lifecycle
 
@@ -79,19 +80,22 @@ Full schemas, payloads, and responses are in `TOOLS_AND_APIS.md` — use those d
 4. AI speaks
    → Agent greets the user and asks {{question}} in its own natural phrasing
 
-5. User responds; agent may ask one brief follow-up if it doesn't yet have enough
-   to judge how strongly this emotion is present — it never asks the user for a number
-
-6. Client tool is called
-   → Agent silently determines a 1–10 score from the full exchange (never spoken aloud)
-     and calls record_emotion_score({ emotionId, score })
-   → App writes the score into local check-in state
+5. User responds; agent may ask one brief follow-up if the answer was too thin
+   to reflect anything real — it never asks the user for a number, and it does
+   not judge or score the exchange itself
    → (If the user is in crisis) Agent instead calls flag_needs_support and gives its
-     brief, caring redirect; the app ends the session and routes to support resources
+     brief, caring redirect — this is the one thing still handled live, in-conversation
 
-7. Agent closes the turn with a short thank-you; session ends
-   → conversation.endSession()
-   → User taps Continue; app moves to the next emotion (repeat steps 2–7)
+6. Agent closes the turn with a short thank-you; session stays open until the
+   user taps Continue (so the agent can still be listening/scored if they add more)
+
+7. User taps Continue
+   → App ends the session (conversation.endSession())
+   → App sends this emotion's full transcript to POST /assessment/emotion-score
+   → Backend's AI judge returns a 1–10 score for that emotion
+   → App writes the score into local check-in state, then moves to the next
+     emotion (repeat steps 2–7) — or, if the agent flagged support in step 5,
+     the app instead routes to the support-resources screen
 
 8. After the LAST emotion in the set:
    → Baseline: app calls POST /assessment/baseline with all 12 scores

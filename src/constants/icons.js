@@ -31,6 +31,7 @@ export const ICONS = {
   EMPTY: 'cloud-outline',
   PLAY: 'play',
   PAUSE: 'pause',
+  SEND: 'send',
   BACK: 'arrow-back',
   CLOSE: 'close',
   LOGOUT: 'log-out-outline',

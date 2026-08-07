@@ -18,8 +18,7 @@ const RootNavigator = () => {
   const { isBootstrapping, isAuthenticated, hasOnboarded } = useAuth();
   // const isAuthenticated = false;
   // const hasOnboarded = false; // TODO: implement onboarding state — unrelated to auth, left as-is
-  const hasCompletedBaseline = true;
-  // const hasOnboarded = false;
+  const hasCompletedBaseline = false; // TODO: implement baseline assessment state — unrelated to auth, left as-is
 
   if (isBootstrapping) {
     return <SplashScreen />;

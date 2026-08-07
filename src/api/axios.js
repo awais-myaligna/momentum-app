@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createApiError, ERROR_TYPES } from '../utils/apiError';
 
 export const AUTH_TOKEN_KEY = 'momentum_auth_token';
-const BASE_URL = 'https://api.myaligna.com/api';
+const BASE_URL = 'https://devapi.myaligna.com/api';
 const REQUEST_TIMEOUT = 15000;
 
 const axiosInstance = axios.create({

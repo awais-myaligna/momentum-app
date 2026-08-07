@@ -4,15 +4,16 @@ Scope: this document covers **only what the ElevenLabs Conversational AI agent i
 
 ## How the agent actually gets and produces data today
 
-Momentum's current implementation (`ConversationScreen.js`, `AssessmentNavigator.js`) is deliberately thin at the voice layer:
+Momentum's current implementation (`ConversationScreen.js`, `AssessmentNavigator.js`):
 
-- The React Native app starts one short voice **session per emotion** (`useConversation().startSession()`), passing context in via **Dynamic Variables** (`emotionName`, `question`) — no API call happens to start a session, and the agent calls no tools today.
-- The agent's spoken exchange is transcribed live in the app (`onMessage`) but is **not sent to the Aligna backend** — no audio or transcript leaves the device.
-- The numeric 1–10 score is currently captured **after** the voice turn, by hand, on the next screen (`EmotionRatingScreen` / `DailyCheckInScreen`'s `ScoreSlider`).
+- The React Native app starts one short voice **session per emotion** (`useConversation().startSession()`), passing context in via **Dynamic Variables** (`emotionId`, `emotionName`, `question`, `checkInType`, `stepPosition`) — no API call happens to start a session.
+- The agent's spoken exchange is transcribed live in the app (`onMessage`) but is **not sent to the Aligna backend during the conversation** — no audio or transcript leaves the device while the session is live.
+- **Scoring happens after the conversation ends, not during it, and not by the agent.** When the user taps Continue, the app ends the session and sends that emotion's full transcript to a backend REST endpoint (`POST /assessment/emotion-score`, `API_DOCUMENTATION.md` §3.9), which runs an AI judge over it and returns the 1–10 score. `ConversationScreen.js` records that score directly — there is no manual scoring screen. `EmotionRatingScreen` (the old tap-to-select scale) has been removed from the baseline flow.
+- **This replaced an earlier design** where the agent itself judged the exchange mid-conversation and called a `record_emotion_score` client tool. That proved unreliable to get calling consistently — a tool call buried inside a live voice session, with no visibility into whether or why it didn't fire, was much harder to debug than one ordinary REST call with a transcript you can log and replay. If your agent config still has `record_emotion_score` registered from that earlier setup, remove it.
+- The one thing that still has to happen live, in-conversation, is crisis detection (`flag_needs_support`, below) — that can't wait for a transcript to be judged after the fact.
+- If the voice connection fails, the screen falls back to a text-chat exchange with the same agent/session (mic muted, typed input via `sendUserMessage`) rather than a manual picker. The transcript is captured the same way either way, so post-conversation scoring is unaffected by which mode produced it. If the connection also fails, or `EXPO_PUBLIC_AGENT_ID` isn't set, the screen shows a Retry state.
 
-**This last point is a documented gap, not the intended design.** Per the Momentum Roadmap, the intended flow has the LLM itself interpret the user's spoken answer and assign the 1–10 score — the user is never asked to manually pick a number during the assessment. `EmotionRatingScreen`'s tap-to-select scale reflects an earlier/interim build and should be removed from the intended baseline and daily flows once `record_emotion_score` (below) is wired in; it should not be treated as a confirmation step the user sees.
-
-Everything below Section 1 is the **recommended production configuration** — grounded entirely in Momentum's existing, documented backend contract (`API_DOCUMENTATION.md`) — that lets the agent capture the score itself from the conversation. Nothing below is speculative feature creep: each tool exists to let the agent do only what `SYSTEM_PROMPT.md` already asks of it.
+**Daily check-in (`DailyCheckInScreen.js`) is out of scope for this pass** and still uses the manual `ScoreSlider` — bringing it in line with the baseline flow above is a follow-up.
 
 ---
 
@@ -22,7 +23,8 @@ Not a function the agent calls — this is the data the React Native app fetches
 
 | Variable | Purpose | Source |
 |---|---|---|
-| `emotionName` | Which of the 12 emotions this session is about | `EMOTIONS` (client-bundled) |
+| `emotionId` | The exact slug the agent must echo back as `emotionId` on `flag_needs_support` — sent explicitly so the agent never has to derive it from `emotionName` | `EMOTIONS` (client-bundled) |
+| `emotionName` | Which of the 12 emotions this session is about, for speaking to the user | `EMOTIONS` (client-bundled) |
 | `question` | The reflective question to open with | `BASELINE_QUESTIONS` / `DAILY_QUESTIONS` (client-bundled) |
 | `checkInType` | `"baseline"` or `"daily"` | Which navigator/screen started the session |
 | `stepPosition` | e.g. `"3 of 12"` | Assessment/daily check-in progress state |
@@ -34,44 +36,11 @@ No backend call is required from the agent to obtain any of this — it all arri
 
 ## 2. Client Tools (called BY the agent, during the conversation)
 
-These are registered as **Client Tools** in the ElevenLabs agent config, then implemented in the app via `useConversation({ clientTools: { ... } })`. They execute locally in the React Native app (not a network hop to a server) — the fastest, lowest-latency way for the agent to affect app state mid-conversation.
+Registered as a **Client Tool** in the ElevenLabs agent config, then implemented in the app via `useConversation({ clientTools: { ... } })`. It executes locally in the React Native app (not a network hop to a server) — the fastest, lowest-latency way for the agent to affect app state mid-conversation.
 
-### 2.1 `record_emotion_score`
+There is exactly **one** client tool now — scoring is not a tool call (see §3).
 
-| | |
-|---|---|
-| **Purpose** | Lets the agent save the 1–10 score **it has determined itself**, by interpreting the user's natural-language answer (tone, word choice, content) against the rubric in `SYSTEM_PROMPT.md`'s "How scores are assigned." The user is never asked to state or choose a number — this tool is how the AI's own judgment becomes the recorded score. |
-| **When called** | Once per session, silently, after the agent has gathered enough from the exchange (the initial answer, plus at most one follow-up if needed) to confidently judge how strongly the emotion is present. Not announced to the user and not preceded by asking them for a number. |
-
-**Payload (agent → app)**
-```json
-{
-  "emotionId": "confidence",
-  "score": 7
-}
-```
-
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `emotionId` | string enum | Yes | One of the 12 emotion ids; must match the session's `{{emotionName}}` |
-| `score` | integer | Yes | 1–10 inclusive — the agent's own assigned value, not a number spoken by the user |
-
-**Response (app → agent)**
-```json
-{ "success": true, "score": 7 }
-```
-
-**Error response**
-```json
-{ "success": false, "error": "INVALID_SCORE", "message": "Score must be an integer between 1 and 10." }
-```
-On error, the agent should silently retry with a corrected integer in range — this is a formatting failure on the agent's side, not something to surface to the user, since the user was never involved in producing the number.
-
-**Fallback when voice is unavailable**: because manual score entry is intentionally removed from the intended flow, a connection failure (`onError`, no `AGENT_ID`) needs its own path to a score rather than falling back to a tap-to-select scale. Recommended: fall back to a **text-chat** exchange that still runs the same interpret-and-score behavior (the user types instead of speaks, the same scoring logic calls this tool) rather than reintroducing a manual picker. This is flagged as an open implementation item, not yet built.
-
----
-
-### 2.2 `flag_needs_support`
+### 2.1 `flag_needs_support`
 
 | | |
 |---|---|
@@ -99,25 +68,24 @@ On error, the agent should silently retry with a corrected integer in range — 
 ```
 This tool's error path does not change the agent's behavior — the agent still gives its brief, caring, redirect-to-real-help response regardless of whether the flag was recorded successfully; recording the flag is for the app to surface resources, not a precondition for the agent's response.
 
-**App-side behavior**: on success, the app should end the voice session and route the user to a support-resources screen rather than continuing the check-in flow. (No such screen exists in the current build — flagged here as a required companion addition alongside enabling this tool.)
+**App-side behavior**: implemented as `SupportResourcesScreen.js`. On call, `ConversationScreen.js` does *not* end the session immediately — that would cut the agent off mid-sentence during its brief, caring redirect. Instead it flags local state, lets the agent finish speaking, and swaps the footer button to "Get Support"; tapping it ends the session and routes to `SupportResourcesScreen` (crisis-line resources, a bridge to real help, not the check-in flow). This copy has not had a clinical/legal review — treat it as a first pass.
 
 ---
 
 ## 3. Backend REST APIs the conversation's outcome depends on
 
-The agent never calls these directly — they're invoked by the React Native app immediately after a check-in flow completes, using the scores the conversation (via `record_emotion_score`, or the manual scale as fallback) produced. Included here because the voice conversation's entire purpose is to produce the data these calls submit — full request/response detail lives in `API_DOCUMENTATION.md`.
+The agent never calls these directly — they're invoked by the React Native app. Full request/response detail lives in `API_DOCUMENTATION.md`.
 
 | Endpoint | Called when |
 |---|---|
-| `POST /assessment/baseline` | After the 12th (final) baseline emotion is rated — submits all 12 scores at once. See `API_DOCUMENTATION.md` §5.1. |
-| `POST /checkin` | After the 4th (final) daily emotion is rated — submits that day's 4 scores. See `API_DOCUMENTATION.md` §7.2. |
-| `GET /dashboard` | Immediately after either submission, to render the updated chart. See `API_DOCUMENTATION.md` §6.1. |
-
-These require no changes for voice support — they already accept exactly the score data the conversation produces.
+| `POST /assessment/emotion-score` | Once per emotion, right after the user taps Continue — sends that emotion's transcript, gets back its 1–10 score. This is where the AI judging actually happens now. See `API_DOCUMENTATION.md` §3.9. |
+| `POST /assessment/baseline` | After the 12th (final) baseline emotion is scored — submits all 12 scores at once. See `API_DOCUMENTATION.md` §3.4. |
+| `POST /checkin` | After the 4th (final) daily emotion is scored — submits that day's 4 scores. See `API_DOCUMENTATION.md` §3.6.2. |
+| `GET /dashboard` | Immediately after either submission, to render the updated chart. See `API_DOCUMENTATION.md` §3.5. |
 
 ---
 
 ## Summary: what to actually add in the ElevenLabs dashboard
 
-- **Client Tools**: `record_emotion_score`, `flag_needs_support` (Section 2). Nothing else — the agent does not need read access to any backend API; all context arrives via Dynamic Variables (Section 1).
+- **Client Tools**: `flag_needs_support` only (Section 2). The agent does not need read access to any backend API; all context arrives via Dynamic Variables (Section 1), and scoring is a REST call the app makes on its own after the session ends — not something the agent triggers.
 - **No server tools / webhooks are required.** Momentum's backend never needs to be reachable from ElevenLabs directly.

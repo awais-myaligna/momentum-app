@@ -22,7 +22,7 @@ export const AUTH_ROUTES = {
 
 export const ASSESSMENT_ROUTES = {
   CONVERSATION: 'Conversation',
-  EMOTION_RATING: 'EmotionRating',
+  SUPPORT: 'AssessmentSupport',
   BASELINE_COMPLETION: 'BaselineCompletion',
   EMOTION_DETAIL: 'AssessmentEmotionDetail',
   ROADMAP: 'EmotionalRoadmap',

@@ -9,11 +9,11 @@ import Icon from '../../components/Icon';
 import Loading from '../../components/Loading';
 import ProgressBar from '../../components/ProgressBar';
 import { ICONS } from '../../constants/icons';
+import { useAuth } from '../../context/AuthContext';
 import { getEmotionById, getScoreBand } from '../../data/emotions';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { HOME_ROUTES } from '../../navigation/routes';
+import { HOME_ROUTES, MAIN_TAB_ROUTES } from '../../navigation/routes';
 import { getDashboard } from '../../services/dashboardService';
-import { getProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
 const BAND_TEXT_CLASS = {
@@ -27,18 +27,26 @@ const FOCUS_COUNT = 3;
 // Main Home tab landing screen (roadmap section 7): a quick summary of the
 // user's ongoing chart plus the lowest-scoring emotions to focus on today.
 const HomeScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
-  const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  const userName = user?.name || user?.first_name || 'User';
+  const userAvatar =
+    user?.avatar ||
+    user?.avatar_url ||
+    user?.avatarUrl ||
+    user?.profile_picture ||
+    user?.image ||
+    user?.photo;
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [dashboardData, profileData] = await Promise.all([getDashboard(), getProfile()]);
+      const dashboardData = await getDashboard();
       setDashboard(dashboardData);
-      setProfile(profileData);
     } catch {
       setHasError(true);
     } finally {
@@ -74,13 +82,19 @@ const HomeScreen = ({ navigation }) => {
       ) : (
         <>
           <View className="mb-5 mt-2 flex-row items-center justify-between">
-            <View>
-              <Text className="text-sm text-textSecondary">Welcome back,</Text>
-              <Text className="text-2xl font-bold text-text">
-                {profile?.name?.split(' ')[0] ?? 'there'}
+            <View className="mr-3 flex-1">
+              <Text className="text-sm text-textSecondary">Welcome,</Text>
+              <Text className="text-2xl font-bold text-text" numberOfLines={1} ellipsizeMode="tail">
+                {userName}
               </Text>
             </View>
-            <Avatar name={profile?.name} size="md" />
+            <TouchableOpacity
+              onPress={() => navigation.navigate(MAIN_TAB_ROUTES.PROFILE)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Go to profile">
+              <Avatar name={userName} uri={userAvatar} size="md" />
+            </TouchableOpacity>
           </View>
 
           <Card className="mb-4">

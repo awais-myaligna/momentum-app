@@ -33,7 +33,18 @@ const ProfileScreen = ({ navigation }) => {
   return (
     <ScreenWrapper scroll>
       <View className="mb-6 mt-2 items-center">
-        <Avatar name={user?.name} size="xl" />
+        <Avatar
+          name={user?.name}
+          uri={
+            user?.avatar ||
+            user?.avatar_url ||
+            user?.avatarUrl ||
+            user?.profile_picture ||
+            user?.image ||
+            user?.photo
+          }
+          size="xl"
+        />
         <Text className="mt-3 text-xl font-bold text-text">{user?.name}</Text>
         <Text className="mt-0.5 text-sm text-textSecondary">{user?.email}</Text>
       </View>

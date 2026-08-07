@@ -8,11 +8,12 @@ export const ENDPOINTS = {
     LOGOUT: '/auth/logout',
   },
   EMOTIONS: {
-    LIST: '/emotions',
+    LIST: '/momentum/emotions',
     DETAIL: (emotionId) => `/emotions/${emotionId}`,
   },
   ASSESSMENT: {
     SUBMIT_BASELINE: '/assessment/baseline',
+    SCORE_EMOTION: '/assessment/emotion-score',
   },
   DASHBOARD: '/dashboard',
   CHECKIN: {

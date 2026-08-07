@@ -1,8 +1,8 @@
 # Momentum — Backend API Documentation
 
-Derived entirely from the current frontend implementation (`src/services/*`, `src/context/*`, `src/screens/**`, `src/navigation/**`, `src/data/*`, `src/utils/*`). Every endpoint below is backed by a real call site in the app today — nothing is speculative. Endpoints the frontend does not yet call are called out explicitly in **Future / Recommended Additions** at the end, kept separate from the required spec.
+Derived entirely from the current frontend implementation (`src/services/*`, `src/context/*`, `src/screens/**`, `src/navigation/**`, `src/data/*`, `src/utils/*`). Every endpoint below is backed by a real call site in the app today — nothing is speculative.
 
-The app currently runs entirely on an in-memory mock (`src/mocks/mockStore.js` + `src/utils/mockRequest.js`) via a stubbed Axios instance (`src/api/axios.js`) pointed at `https://example.com/api`. `src/api/endpoints.js` already defines the intended path map — this document formalizes it into a full contract.
+**The app is now a hybrid.** Part of it talks to the real Aligna backend at `https://devapi.myaligna.com/api` (`src/api/axios.js`); the rest still runs on the in-memory mock (`src/mocks/mockStore.js` + `src/utils/mockRequest.js`). §2 below lists everything that is genuinely wired to the real backend today — those are **excluded** from the build spec in §3, since they're already done and any spec drift should be resolved by reading the real call sites (linked per entry), not this document. §3 is the actual remaining backend work, corrected against what we now know about the real backend's conventions (see §1).
 
 ---
 
@@ -10,31 +10,37 @@ The app currently runs entirely on an in-memory mock (`src/mocks/mockStore.js` +
 
 ### Base URL
 ```
-https://api.aligna.ai/v1
+https://devapi.myaligna.com/api
 ```
-(placeholder — replace with the real Aligna backend host)
+No longer a placeholder — this is the real, live host the app points at (`src/api/axios.js`).
 
 ### Authentication
 Two modes, matching `src/api/axios.js`:
-- **Public** — no token required (Register, Login).
-- **Bearer Token** — `Authorization: Bearer <token>` attached automatically by the Axios request interceptor from `expo-secure-store` (`momentum_auth_token`) for every other call. There is currently **no refresh-token flow** in the frontend — a `401` is treated as "session expired, please sign in again" (see `ERROR_TYPES.UNAUTHORIZED` in `src/utils/apiError.js`).
+- **Public** — no token required (Login, Register, Send OTP, Verify OTP, Reset Password).
+- **Bearer Token** — `Authorization: Bearer <token>` attached automatically by the Axios request interceptor from `expo-secure-store` (`momentum_auth_token`) for every other call. There is currently **no refresh-token flow** — a `401` is not yet handled specially (see **Standard Error Envelope** below — the status-code mapping described there is not currently wired up in code).
+
+**Path naming is inconsistent across the real backend** — worth flattening/agreeing with the backend team before building more:
+- Auth endpoints are flat: `/login`, `/register`, `/send-otp`, `/verify-otp`, `/reset-password` (not `/auth/*` as `src/api/endpoints.js`'s `ENDPOINTS.AUTH` still assumes — that constant is stale/unused; `authService.js` calls these paths as string literals directly).
+- Profile is namespaced: `/user/profile`.
+- Emotions is namespaced differently again: `/momentum/emotions`.
+
+If §3's remaining endpoints get a `/momentum/*` prefix too (matching Emotions), everything documented below with a bare path (`/dashboard`, `/checkin`, `/history`, etc.) will need the same prefix — flag this with the backend team rather than guessing per-endpoint.
 
 ### Standard Request Headers
 ```
 Content-Type: application/json
 Accept: application/json
-Authorization: Bearer <token>   // omit for public endpoints
+Authorization: Bearer <token>   // omitted for public endpoints
+x-api-key: 12345678
 ```
+The `x-api-key` header is sent on **every** request (`src/api/axios.js`) and is currently a hardcoded literal in client source, not an env/secret-store value — flag this with the backend team; it's not documented anywhere as a real requirement, it's just what the client happens to send today.
 
 ### Standard Response Envelope
-The frontend's Axios response interceptor unwraps `response.data` directly (`src/api/axios.js` line 32), so the backend should return the payload described per-endpoint below at the top level of `data`. Recommended envelope:
-```json
-{
-  "success": true,
-  "message": "Optional human-readable message",
-  "data": { }
-}
-```
+**Real responses do not consistently use one envelope shape** — two shapes are observed in integrated endpoints today:
+- **Flat** — Login/Register/Profile responses put fields (`user`, `token`, `message`) directly at the top level, no `data` wrapper (`src/services/authService.js`, `src/services/profileService.js`).
+- **Wrapped** — Get Emotions List returns `{ success, message, data: [...] }` (confirmed via Postman, now integrated — see §2).
+
+The Axios response interceptor only unwraps `response.data` (the HTTP body) — it does **not** normalize between these two shapes (`src/api/axios.js` line 32-33). Any new endpoint should confirm which shape it actually returns rather than assuming the wrapped one below is universal.
 
 ### Standard Error Envelope
 ```json
@@ -45,7 +51,11 @@ The frontend's Axios response interceptor unwraps `response.data` directly (`src
   "errors": [{ "field": "email", "message": "Enter a valid email address" }]
 }
 ```
-The frontend maps HTTP status to one of five internal error types (`src/utils/apiError.js`):
+**This mapping is currently disabled in code**, not active behavior — `src/api/axios.js`'s response error interceptor (the part that would turn a raw Axios error into one of the internal types below) is commented out. Today, a failed request rejects with the raw Axios error object, and each screen parses it itself — and inconsistently:
+- `LoginScreen.js` / `RegisterScreen.js` only read `err.message` (the generic Axios message, e.g. "Request failed with status code 422" — not the backend's actual `message`).
+- `ForgotPasswordScreen.js` / `VerifyOtpScreen.js` / `ResetPasswordScreen.js` correctly read `err.response?.data?.message` first, falling back to `err.message`.
+
+Worth fixing (re-enable the interceptor, make all screens consistent) but out of scope for this document. The table below describes the **intended** behavior once/if the interceptor is re-enabled:
 
 | Status | Internal type | Frontend behavior |
 |---|---|---|
@@ -55,7 +65,7 @@ The frontend maps HTTP status to one of five internal error types (`src/utils/ap
 | `>= 500` | `SERVER` | "Something went wrong on our end..." |
 | Anything else | `UNKNOWN` | Uses `data.message` if present, else generic fallback |
 
-These apply globally to **every** endpoint below, so per-endpoint sections only list status codes with endpoint-specific meaning (e.g. a `404` for "emotion not found"). `403` (forbidden) and `429` (rate limited) are not currently distinguished by the frontend — they will render as `UNKNOWN`/generic error toasts, but should still be returned correctly by the backend for security/observability.
+`403` (forbidden) and `429` (rate limited) are not currently distinguished by the frontend — they will render as `UNKNOWN`/generic error toasts, but should still be returned correctly by the backend for security/observability.
 
 ### Score scale
 All emotion scores are **integers 1–10 inclusive** (`src/components/ScoreSlider.js` — pill selector, not a continuous slider). No 0 or decimal values anywhere in the frontend.
@@ -67,176 +77,42 @@ clarity, confidence, enthusiasm, resilience, hope, contentment
 ```
 Source of truth today: `src/data/emotions.js` (`EMOTIONS`). Order matters — it drives assessment step sequence and daily rotation grouping.
 
+**⚠️ ID scheme mismatch to resolve before building §3.4–§3.7:** the now-real Get Emotions List endpoint (§2) returns **numeric** ids (`1`–`12`), not these string slugs. Every endpoint still to be built in §3 — Assessment baseline, Dashboard, Daily Check-in, History — currently assumes `scores`/`chart`/`emotionId` are keyed by the **string slug** (e.g. `"joy": 7`), because that's what the bundled `src/data/emotions.js` and all client-side logic (`AssessmentContext`, daily rotation, score bands) still use. Nothing in the frontend currently maps the real numeric emotion ids back to these slugs — that mapping needs to be decided (by name match, since `sortOrder` 1–12 happens to line up with this list's order today, or by adding a slug field to the real endpoint) before the remaining endpoints below are built against real numeric ids.
+
 ---
 
-## 2. Authentication
+## 2. Integrated Endpoints (Live — Do Not Rebuild)
 
-### 2.1 Register
+These are genuinely wired to the real backend today. Treat the linked source file as the source of truth for exact shapes — this is a pointer, not a spec, since the real behavior may keep evolving independently of this document.
 
-| | |
-|---|---|
-| **Endpoint** | `POST /auth/register` |
-| **Purpose** | Creates a new Aligna account and starts an authenticated session so the app can proceed straight into the baseline assessment. Called from `RegisterScreen` → `AuthContext.register()` → `authService.register()`. |
-| **Auth** | Public |
-
-**Request Headers**
-```
-Content-Type: application/json
-Accept: application/json
-```
-
-**Request Payload**
-```json
-{
-  "name": "Jordan Lee",
-  "email": "jordan@example.com",
-  "password": "hunter22"
-}
-```
-
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `name` | string | Yes | trimmed, min 2 chars | Full display name |
-| `email` | string | Yes | trimmed, valid email format | Login identifier |
-| `password` | string | Yes | min 6 chars | Plaintext over TLS; hash server-side (bcrypt/argon2) |
-
-Note: `RegisterScreen`'s form also collects `confirmPassword`, validated client-side only (`Yup.ref('password')` in `src/utils/validationSchemas.js`) — **do not** send it to the backend.
-
-**Success Response — `201 Created`**
-```json
-{
-  "success": true,
-  "message": "Account created successfully",
-  "data": {
-    "token": "eyJhbGciOi...",
-    "user": {
-      "id": "usr_8f3a1c",
-      "name": "Jordan Lee",
-      "email": "jordan@example.com"
-    },
-    "hasCompletedBaseline": false
-  }
-}
-```
-
-| Field | Description |
-|---|---|
-| `token` | Bearer token, stored client-side in `expo-secure-store` under `momentum_auth_token` |
-| `user.id` / `.name` / `.email` | Echoed back for the session |
-| `hasCompletedBaseline` | **Required for `RootNavigator`'s routing gate** — `AuthContext` sets this immediately after register/login without a second round trip; must be `false` for a brand-new account |
-
-**Error Responses**
-
-| Status | Meaning | Example |
+| Endpoint | Purpose | Frontend call site |
 |---|---|---|
-| `400` | Malformed JSON body | `{ "success": false, "message": "Invalid request body", "code": "BAD_REQUEST" }` |
-| `409` | Email already registered | `{ "success": false, "message": "An account with this email already exists", "code": "EMAIL_TAKEN" }` |
-| `422` | Field validation failed | `{ "success": false, "message": "Validation failed", "code": "VALIDATION_ERROR", "errors": [{ "field": "password", "message": "Password must be at least 6 characters" }] }` |
-| `429` | Too many registration attempts from this IP | `{ "success": false, "message": "Too many attempts. Try again later.", "code": "RATE_LIMITED" }` |
-| `500` | Server error | `{ "success": false, "message": "Something went wrong on our end. Please try again shortly.", "code": "SERVER_ERROR" }` |
+| `POST /login` | Authenticates an existing user; returns `{ user, token, message }` flat (no `data` wrapper). `hasCompletedBaseline` comes back on `user`. | `src/services/authService.js:login()` ← `LoginScreen.js` |
+| `POST /register` | Creates an account. Real payload is much richer than a name/email/password form: `{ first_name, last_name, nickname, dob, gender, default_language, default_agent, email, phone, password, password_confirmation }`. | `src/services/authService.js:register()` ← `RegisterScreen.js` |
+| `POST /send-otp` | Sends a password-reset OTP to `{ email }`. Used both for the initial "Forgot password?" flow and OTP resend. | `src/services/authService.js:sendOtp()` ← `ForgotPasswordScreen.js`, `VerifyOtpScreen.js` (resend) |
+| `POST /verify-otp` | Verifies `{ email, otp }`; response must include `reset_token`, which the client carries forward to Reset Password — client throws if it's missing. | `src/services/authService.js:verifyOtp()` ← `VerifyOtpScreen.js` |
+| `POST /reset-password` | Submits `{ email, token, password, password_confirmation }` to finalize the reset. | `src/services/authService.js:resetPassword()` ← `ResetPasswordScreen.js` |
+| `GET /user/profile` | Returns the user's **identity** fields: `first_name`, `last_name`, `nickname`, `email`, `phone`, `dob`, `gender`, `default_language`, `default_agent`. Response is `{ user, message }` or the user flat — client checks both (`response?.user \|\| response`). | `src/services/profileService.js:getUserProfile()` ← `EditProfileScreen.js` |
+| `PUT /user/profile` | Partial update of the same identity fields; client only ever sends the diffed subset. Response must include `user`, or the client throws. | `src/services/profileService.js:updateUserProfile()` ← `EditProfileScreen.js` |
+| `GET /momentum/emotions` | Returns the 12 core emotions: `{ success, message, data: [{ id, name, icon, description, sortOrder }] }` — `data` **is** the wrapper here (see §1's envelope note). `id` is numeric, not the string slug — see §1's ID scheme warning. | `src/services/emotionService.js:getEmotions()` — just integrated; **no screen calls it yet**, same as before (screens still read the bundled `src/data/emotions.js` constant directly) |
 
-**Validation Rules**
-- Email must be RFC-valid and unique (case-insensitive match recommended).
-- Password minimum 6 characters (frontend enforces this minimum; consider raising server-side to 8+ with complexity rules since 6 is quite low for production).
-- Name minimum 2 characters after trim.
-
-**Database Objects**: `User`
-
-**Frontend Usage**: `src/screens/Auth/RegisterScreen.js` (Formik submit) → `src/context/AuthContext.js:register()` → `src/services/authService.js:register()`. Called once, on account creation.
-
-**Caching**: None. Token persisted to `expo-secure-store`; no in-memory cache needed beyond React state.
-
-**Pagination**: N/A
-
-**Search & Filters**: N/A
-
-**File Upload**: N/A — no avatar/image upload exists anywhere in the current UI (`Avatar.js` renders initials only).
-
-**Notes**: `AuthContext` sets `isAuthenticated = true` and reads `hasCompletedBaseline` synchronously from this response — do not omit it or the app will misroute.
+**Not (yet) real, despite looking similar:**
+- **Logout** (`POST /logout`) — the real call is written but currently **commented out** in `src/services/authService.js:logout()`; only the local token/user is cleared from `expo-secure-store`. No server-side session invalidation happens today. This stays documented as a remaining item — see §3.1.
+- **Preferences profile** (language / voice / notifications) — a *different* profile concept from `/user/profile` above, still fully mocked. See §3.2.
 
 ---
 
-### 2.2 Login
+## 3. Remaining / To Be Built
+
+Only these are still backed by the mock (`src/mocks/mockStore.js`) and need real backend work. Everything else has been removed from this document per §2.
+
+### 3.1 Logout
 
 | | |
 |---|---|
-| **Endpoint** | `POST /auth/login` |
-| **Purpose** | Authenticates an existing user. Called from `LoginScreen` → `AuthContext.login()` → `authService.login()`. |
-| **Auth** | Public |
-
-**Request Headers**
-```
-Content-Type: application/json
-Accept: application/json
-```
-
-**Request Payload**
-```json
-{
-  "email": "jordan@example.com",
-  "password": "hunter22"
-}
-```
-
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `email` | string | Yes | trimmed, valid email | Login identifier |
-| `password` | string | Yes | min 6 chars | Plaintext over TLS |
-
-**Success Response — `200 OK`**
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "token": "eyJhbGciOi...",
-    "user": {
-      "id": "usr_8f3a1c",
-      "name": "Jordan Lee",
-      "email": "jordan@example.com"
-    },
-    "hasCompletedBaseline": true
-  }
-}
-```
-Same field meanings as Register. `hasCompletedBaseline` here reflects the account's real history and drives whether `RootNavigator` sends the user into the baseline `AssessmentFlow` or straight to `MainFlow`.
-
-**Error Responses**
-
-| Status | Meaning | Example |
-|---|---|---|
-| `400` | Malformed body | `{ "success": false, "message": "Invalid request body", "code": "BAD_REQUEST" }` |
-| `401` | Wrong email/password | `{ "success": false, "message": "Incorrect email or password", "code": "INVALID_CREDENTIALS" }` |
-| `404` | No account for that email *(optional — many APIs intentionally return 401 instead, to avoid leaking which emails are registered)* | `{ "success": false, "message": "Incorrect email or password", "code": "INVALID_CREDENTIALS" }` |
-| `422` | Validation failed | `{ "success": false, "message": "Validation failed", "code": "VALIDATION_ERROR", "errors": [{ "field": "email", "message": "Enter a valid email address" }] }` |
-| `429` | Too many failed attempts | `{ "success": false, "message": "Too many attempts. Try again later.", "code": "RATE_LIMITED" }` |
-| `500` | Server error | `{ "success": false, "message": "Something went wrong on our end. Please try again shortly.", "code": "SERVER_ERROR" }` |
-
-**Validation Rules**: Same as Register (email format, password min 6).
-
-**Database Objects**: `User`
-
-**Frontend Usage**: `src/screens/Auth/LoginScreen.js` → `AuthContext.login()` → `authService.login()`.
-
-**Caching**: None.
-
-**Notes**: Recommend `401` (not `404`) for unknown email, to avoid user enumeration.
-
----
-
-### 2.3 Logout
-
-| | |
-|---|---|
-| **Endpoint** | `POST /auth/logout` |
-| **Purpose** | Invalidates the current session server-side. Called from `ProfileScreen` (via the "Log Out" confirmation dialog) → `AuthContext.logout()` → `authService.logout()`. |
+| **Endpoint** | `POST /logout` |
+| **Purpose** | Invalidate the current session server-side. The frontend already has this call written (`src/services/authService.js`) but it's commented out — re-enabling it is a one-line frontend change once the backend endpoint is confirmed to exist and behave correctly. |
 | **Auth** | Bearer Token |
-
-**Request Headers**
-```
-Authorization: Bearer <token>
-Accept: application/json
-```
 
 **Request Payload**: none (empty body)
 
@@ -252,31 +128,24 @@ Accept: application/json
 | `401` | Token missing/expired/already invalidated |
 | `500` | Server error |
 
-**Database Objects**: `User` (and `Session`/`RefreshToken` if that model is adopted — see Future Additions).
+**Frontend Usage**: `src/screens/Profile/ProfileScreen.js` — confirmation dialog → `AuthContext.logout()` → `authService.logout()`. The client always clears its local token/user regardless of this call's outcome, so it should be treated as best-effort from the client's perspective, but the server must still actually invalidate the token.
 
-**Frontend Usage**: `src/screens/Profile/ProfileScreen.js` — confirmation dialog → `logout()`. On success (or failure), the client always clears its local mock state and deletes the stored token (`SecureStore.deleteItemAsync`), so the backend call should be treated as best-effort from the client's perspective, but the server must still actually invalidate the token.
-
-**Caching**: N/A. **Notes**: Should be idempotent — calling it twice (e.g. a retried request) must not error.
+**Notes**: Should be idempotent — calling it twice (e.g. a retried request) must not error.
 
 ---
 
-## 3. Profile & Settings
+### 3.2 Preferences Profile (Notifications / Language / Voice)
 
-The frontend has **one** profile object and **one** update endpoint. `NotificationScreen`, `LanguageScreen`, and `VoicePreferencesScreen` are three different UI surfaces that all call the *same* `updateProfile()` with a single changed field — there is no separate "notifications API" or "language API". Documenting this as one endpoint (not four) intentionally avoids duplicate endpoints per the reuse principle.
+**Distinct from the real `/user/profile` in §2** — that endpoint owns identity fields (name, email, dob, gender, etc.); this one owns Momentum-specific preferences. `NotificationScreen`, `LanguageScreen`, and `VoicePreferencesScreen` are three different UI surfaces that all call the *same* mocked `getProfile()`/`updateProfile()` today — there is no separate "notifications API" or "language API", and that reuse should carry over to the real implementation (one endpoint, not four).
 
-### 3.1 Get Profile
+**Before building this as a new endpoint**, note the overlap with §2's real `/user/profile`: it already returns `default_language` and `default_agent`, which are conceptually the same values as this section's `language` and `voice`. Confirm with the backend team whether `LanguageScreen`/`VoicePreferencesScreen` should simply be repointed at `/user/profile`'s existing fields instead of getting a new endpoint — that would remove this section entirely rather than requiring new backend work.
+
+#### 3.2.1 Get Preferences
 
 | | |
 |---|---|
-| **Endpoint** | `GET /profile` |
-| **Purpose** | Fetches the current user's profile: identity plus Momentum preferences (language, voice, notifications). |
+| **Endpoint** | `GET /profile` *(placeholder path — resolve against §3.2's overlap note above before building)* |
 | **Auth** | Bearer Token |
-
-**Request Headers**
-```
-Authorization: Bearer <token>
-Accept: application/json
-```
 
 **Success Response — `200 OK`**
 ```json
@@ -295,32 +164,24 @@ Accept: application/json
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | User id |
-| `name` | string | Display name |
-| `email` | string | Account email |
-| `language` | enum string | One of `English`, `Spanish`, `French`, `Portuguese` (`LanguageScreen.js` — roadmap §12) |
-| `voice` | enum string | One of `Female`, `Male` (`VoicePreferencesScreen.js` — roadmap §12, agent voice/gender) |
+| `language` | enum string | One of `English`, `Spanish`, `French`, `Portuguese` (`LanguageScreen.js`) |
+| `voice` | enum string | One of `Female`, `Male` (`VoicePreferencesScreen.js`) |
 | `notificationsEnabled` | boolean | Daily check-in reminder toggle (`NotificationScreen.js`) |
 
-**Error Responses**: `401` (no/expired token), `404` (profile not found for a valid token — should not normally happen), `500`.
+**Error Responses**: `401`, `404` (profile not found for a valid token — should not normally happen), `500`.
 
-**Database Objects**: `User`
+**Frontend Usage**: `HomeScreen.js`, `SettingsScreen.js`, `NotificationScreen.js`, `LanguageScreen.js`, `VoicePreferencesScreen.js` (all via `useFocusEffect`/mount, no shared cache).
 
-**Frontend Usage**: Called on mount/focus by `HomeScreen`, `ProfileScreen`, `SettingsScreen` (via `useFocusEffect`, refetches every time the tab regains focus), `NotificationScreen`, `LanguageScreen`, `VoicePreferencesScreen`.
+**Caching**: Frontend does **not** cache — every screen refetches on mount/focus.
 
-**Caching**: Frontend does **not** cache — every screen refetches on mount/focus. A short server-side cache (or ETag support) is reasonable since this is a low-write, high-read resource.
-
----
-
-### 3.2 Update Profile
+#### 3.2.2 Update Preferences
 
 | | |
 |---|---|
-| **Endpoint** | `PATCH /profile` |
-| **Purpose** | Partial update of profile preferences. Used for three distinct UI actions that all funnel through this one call. |
+| **Endpoint** | `PATCH /profile` *(same placeholder-path caveat as above)* |
 | **Auth** | Bearer Token |
 
-**Request Payload** — any subset of these fields (frontend always sends exactly one at a time, but the endpoint should accept any combination):
+**Request Payload** — any subset (frontend always sends exactly one field at a time):
 ```json
 { "notificationsEnabled": false }
 ```
@@ -331,28 +192,7 @@ Accept: application/json
 { "voice": "Male" }
 ```
 
-| Field | Type | Required | Validation | Description |
-|---|---|---|---|---|
-| `name` | string | No | min 2 chars if present | Not currently editable in the UI, but the service layer is generic — reserve the field |
-| `language` | string | No | one of `English`, `Spanish`, `French`, `Portuguese` | |
-| `voice` | string | No | one of `Female`, `Male` | |
-| `notificationsEnabled` | boolean | No | — | |
-
-**Success Response — `200 OK`** — returns the full, updated profile (same shape as 3.1):
-```json
-{
-  "success": true,
-  "message": "Profile updated",
-  "data": {
-    "id": "usr_8f3a1c",
-    "name": "Alex Rivera",
-    "email": "alex.rivera@example.com",
-    "language": "Spanish",
-    "voice": "Female",
-    "notificationsEnabled": true
-  }
-}
-```
+**Success Response — `200 OK`** — returns the full, updated preferences object (same shape as 3.2.1).
 
 **Error Responses**
 
@@ -362,80 +202,23 @@ Accept: application/json
 | `422` | Invalid enum value | `{ "success": false, "message": "Validation failed", "code": "VALIDATION_ERROR", "errors": [{ "field": "language", "message": "Unsupported language" }] }` |
 | `500` | Server error | — |
 
-**Database Objects**: `User`
-
-**Frontend Usage**:
-- `NotificationScreen.js` — optimistic toggle (flips UI immediately, reverts on error) with `{ notificationsEnabled }`.
-- `LanguageScreen.js` — optimistic select with `{ language }`.
-- `VoicePreferencesScreen.js` — optimistic select with `{ voice }`.
-
-All three use the identical optimistic-update-then-rollback-on-error pattern — worth keeping the response fast (<300ms) since the UI is already showing the new value before the request resolves.
-
-**Caching**: None — always a fresh write.
-
-**Notes**: Every one of these three screens rolls the local UI state back to the previous value if this call fails, so a `4xx` here must not partially apply the update server-side.
+**Frontend Usage**: `NotificationScreen.js`, `LanguageScreen.js`, `VoicePreferencesScreen.js` — all three use an identical optimistic-update-then-rollback-on-error pattern, so a `4xx` here must not partially apply the update server-side, and the response should stay fast (<300ms) since the UI already shows the new value before the request resolves.
 
 ---
 
-## 4. Emotions (Reference Data)
-
-### 4.1 Get Emotions List
+### 3.3 Get Emotion Detail
 
 | | |
 |---|---|
-| **Endpoint** | `GET /emotions` |
-| **Purpose** | Returns the 12 fixed core emotions with display metadata. Wrapped by `emotionService.getEmotions()`, though most screens currently read the bundled `src/data/emotions.js` constant directly rather than calling this — the service exists specifically so that swap is a one-line change later. |
-| **Auth** | Bearer Token (or Public — this is non-personal reference data; either is defensible) |
-
-**Success Response — `200 OK`**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "joy",
-      "name": "Joy",
-      "icon": "happy-outline",
-      "description": "Joy is the feeling of happiness, lightness, and fulfillment...",
-      "sortOrder": 1
-    }
-  ]
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string enum | Stable slug, one of the 12 emotion ids |
-| `name` | string | Display name |
-| `icon` | string | Ionicons glyph name (frontend-specific, but harmless to keep server-driven for consistency across Aligna apps) |
-| `description` | string | "Why it matters" copy shown throughout the app |
-| `sortOrder` | int | Determines assessment step order and daily grouping (see §6 daily rotation) |
-
-**Error Responses**: `500` only — this is static reference data, no auth/validation failure modes.
-
-**Database Objects**: `EmotionDefinition` (effectively a seed/lookup table, not user-specific)
-
-**Frontend Usage**: `emotionService.getEmotions()` (defined, not yet wired into a screen — screens currently import `EMOTIONS` from `src/data/emotions.js` directly).
-
-**Caching**: Aggressively cacheable (long TTL / CDN) — this data changes essentially never.
-
-**Notes**: Because this never varies per user, consider serving it as a static JSON asset or with long `Cache-Control` headers rather than a DB round trip.
-
----
-
-### 4.2 Get Emotion Detail
-
-| | |
-|---|---|
-| **Endpoint** | `GET /emotions/{emotionId}` |
-| **Purpose** | Returns one emotion's metadata **plus the current user's score, score band, and personalized guidance for that band**. This is a per-user, not purely static, endpoint. |
+| **Endpoint** | `GET /emotions/{emotionId}` *(confirm prefix against §1's `/momentum/emotions` note — likely `/momentum/emotions/{emotionId}`)* |
+| **Purpose** | Returns one emotion's metadata **plus the current user's score, score band, and personalized guidance for that band**. Per-user, not static. |
 | **Auth** | Bearer Token |
 
 **Path Parameters**
 
 | Param | Type | Description |
 |---|---|---|
-| `emotionId` | string enum | One of the 12 emotion ids |
+| `emotionId` | — | **Resolve against §1's ID scheme warning** — the real Get Emotions List (§2) uses numeric ids; decide whether this path param takes that numeric id or the frontend's string slug before building. |
 
 **Success Response — `200 OK`**
 ```json
@@ -469,29 +252,25 @@ All three use the identical optimistic-update-then-rollback-on-error pattern —
 | `404` | Unknown `emotionId`, or user has no score yet for this emotion (e.g. baseline not completed) | `{ "success": false, "message": "Unknown emotion: xyz", "code": "NOT_FOUND" }` |
 | `500` | Server error | — |
 
-**Database Objects**: `EmotionDefinition`, `EmotionGuidance` (or bundled — see Notes), `EmotionScore` (latest value per user+emotion)
-
 **Frontend Usage**: `src/screens/Dashboard/EmotionDetailScreen.js`, used in two modes distinguished by `route.params.mode`:
 - `'baseline'` — stepping through all 12 right after the Emotional Compass Check-in, "Continue" chains to the next emotion in order.
 - `'dashboard'` — single ad hoc lookup from Home/Chart tap, no chaining.
 
 **Caching**: `description`/`guidance` text is static and cacheable long-term; `score`/`band` must always be fresh per user.
 
-**Notes**: `guidance` text (`src/data/emotionGuidance.js`) and baseline/daily question text (`src/data/questions.js`) are currently **bundled client-side static content**, not backend-served. This endpoint's shape already accounts for guidance coming from the server for a single source of truth and easier localization (roadmap §12), but if that's overkill for launch, guidance can stay bundled and this endpoint can omit `guidance`/serve it from the same static file the client already has.
+**Notes**: `guidance` text (`src/data/emotionGuidance.js`) and baseline/daily question text (`src/data/questions.js`) are currently **bundled client-side static content**, not backend-served. This endpoint's shape already accounts for guidance coming from the server for a single source of truth and easier localization, but if that's overkill for launch, guidance can stay bundled and this endpoint can omit `guidance`.
 
 ---
 
-## 5. Assessment (Baseline / Emotional Compass Check-in)
-
-### 5.1 Submit Baseline Assessment
+### 3.4 Submit Baseline Assessment
 
 | | |
 |---|---|
-| **Endpoint** | `POST /assessment/baseline` |
-| **Purpose** | Submits all 12 emotion scores collected during the one-time Emotional Compass Check-in (roadmap §5), establishing the user's baseline chart. |
+| **Endpoint** | `POST /assessment/baseline` *(confirm prefix per §1)* |
+| **Purpose** | Submits all 12 emotion scores collected during the one-time Emotional Compass Check-in, establishing the user's baseline chart. |
 | **Auth** | Bearer Token |
 
-**Request Payload**
+**Request Payload** — keys are the string slugs today (see §1's ID scheme warning):
 ```json
 {
   "scores": {
@@ -532,7 +311,7 @@ All three use the identical optimistic-update-then-rollback-on-error pattern —
 | Status | Meaning | Example |
 |---|---|---|
 | `401` | No/expired token | — |
-| `409` | Baseline already completed for this user *(optional — decide whether re-submission is allowed as a "redo baseline" feature; current frontend has no redo flow, so treat a second submit as a hard conflict unless product wants otherwise)* | `{ "success": false, "message": "Baseline already completed", "code": "ALREADY_COMPLETED" }` |
+| `409` | Baseline already completed for this user *(optional — current frontend has no redo flow, so treat a second submit as a hard conflict unless product wants otherwise)* | `{ "success": false, "message": "Baseline already completed", "code": "ALREADY_COMPLETED" }` |
 | `422` | Missing emotion(s) or out-of-range score | `{ "success": false, "message": "Validation failed", "code": "VALIDATION_ERROR", "errors": [{ "field": "scores.clarity", "message": "Score must be between 1 and 10" }] }` |
 | `500` | Server error | — |
 
@@ -540,23 +319,17 @@ All three use the identical optimistic-update-then-rollback-on-error pattern —
 - Exactly the 12 known emotion ids, no more, no fewer.
 - Each score: integer, 1 ≤ score ≤ 10.
 
-**Database Objects**: `User` (flips `hasCompletedBaseline`), `CheckInEntry` (type=`baseline`), `EmotionScore` (×12)
+**Frontend Usage**: `src/screens/Assessment/ConversationScreen.js` — accumulates all 12 answers client-side across the wizard (`AssessmentContext`) and fires this **once**, only on the 12th (last) emotion's "Finish Check-In" tap. On success, `AssessmentCompleteScreen` calls `AuthContext.completeBaseline()`, which is what flips `RootNavigator` from the assessment flow into the main tabs.
 
-**Frontend Usage**: `src/screens/Assessment/EmotionRatingScreen.js` — accumulates all 12 answers client-side across the wizard (`AssessmentContext`) and fires this **once**, only on the 12th (last) emotion's "Finish Check-In" tap. On success, `AssessmentCompleteScreen` calls `AuthContext.completeBaseline()`, which is what flips `RootNavigator` from the assessment flow into the main tabs.
-
-**Caching**: N/A (write). **Pagination/Search**: N/A.
-
-**Notes**: The reflective *question* text asked during this flow (`ConversationScreen.js`) is driven by a third-party **ElevenLabs Conversational AI voice agent**, not this backend — the agent asks the question aloud and has a short spoken exchange; only the final 1–10 rating (entered by hand on the next screen) is what reaches this API. No transcript/audio is sent to the Aligna backend today.
+**Notes**: The reflective *question* for this flow is driven by a third-party **ElevenLabs Conversational AI voice agent** (`ConversationScreen.js`), not this backend. The 1–10 *score* for each emotion comes from `POST /assessment/emotion-score` (§3.9) — the app sends that emotion's transcript there right after the user taps Continue, and accumulates the 12 returned scores client-side before firing this endpoint once at the end. Only text transcripts reach the Aligna backend (via §3.9), never audio, and only for AI judging — this endpoint itself only ever receives the final per-emotion integers.
 
 ---
 
-## 6. Dashboard
-
-### 6.1 Get Dashboard
+### 3.5 Get Dashboard
 
 | | |
 |---|---|
-| **Endpoint** | `GET /dashboard` |
+| **Endpoint** | `GET /dashboard` *(confirm prefix per §1)* |
 | **Purpose** | Single aggregate endpoint powering the Home tab summary, the full Chart screen, and the post-baseline chart reveal. Returns all 12 emotions' latest scores, color-coded, plus a rollup average and the user's current check-in day counter. |
 | **Auth** | Bearer Token |
 
@@ -582,28 +355,24 @@ All three use the identical optimistic-update-then-rollback-on-error pattern —
 | `chart` | array (12 items) | One entry per emotion, in the fixed 12-emotion order |
 | `chart[].color` | enum | `danger` \| `warning` \| `success` — pre-computed score band color |
 | `averageScore` | number | Mean of all 12 scores, rounded to 1 decimal |
-| `currentDay` | int, 1-indexed | Which daily check-in "day" the user is on — drives §7.1's rotation |
+| `currentDay` | int, 1-indexed | Which daily check-in "day" the user is on — drives §3.6's rotation |
 
 **Error Responses**: `401`, `500`.
 
-**Database Objects**: `User`, `EmotionScore` (latest per emotion), `CheckInEntry` (for `currentDay` derivation)
-
 **Frontend Usage**: `HomeScreen.js`, `ChartScreen.js`, `BaselineCompletionScreen.js` (all three call `getDashboard()` independently — no shared cache).
-
-**Caching**: Short TTL (seconds) is reasonable — this changes at most once per day (after a check-in submit), but three separate screens fetch it independently today with no client-side cache, so keep the server response fast.
 
 **Notes**: If no baseline exists yet (`hasCompletedBaseline: false`), `chart[].score` should be `0` for every emotion (matches current mock behavior via `?? 0`), not an error.
 
 ---
 
-## 7. Daily Check-in
+### 3.6 Daily Check-in
 
-### 7.1 Get Today's Check-in
+#### 3.6.1 Get Today's Check-in
 
 | | |
 |---|---|
-| **Endpoint** | `GET /checkin/today` |
-| **Purpose** | Returns the current day's 4-emotion rotation with that rotation's reflective question. Momentum checks in on 4 of the 12 emotions per day, in a repeating 3-day cycle (roadmap §9–10), so the question set changes each time a group comes back around. |
+| **Endpoint** | `GET /checkin/today` *(confirm prefix per §1)* |
+| **Purpose** | Returns the current day's 4-emotion rotation with that rotation's reflective question. Momentum checks in on 4 of the 12 emotions per day, in a repeating 3-day cycle. |
 | **Auth** | Bearer Token |
 
 **Rotation logic** (must be reproduced server-side — currently in `src/data/dailyCheckInSchedule.js`):
@@ -635,28 +404,17 @@ Day pattern 3: enthusiasm, resilience, hope, contentment
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `dayNumber` | int | The user's current day counter (matches `dashboard.currentDay`) |
-| `prompts` | array (exactly 4) | This day's emotion group with the correct rotation-index question |
-
 **Error Responses**: `401`, `500`.
-
-**Database Objects**: `User` (for `currentDay`), `EmotionDefinition`, `DailyQuestionBank` (if server-driven — see Notes)
 
 **Frontend Usage**: `src/screens/CheckIn/DailyCheckInScreen.js`, on mount and on pull-to-retry.
 
-**Caching**: Cacheable for the remainder of the calendar day per user.
+**Notes**: Question text is currently bundled client-side (`src/data/questions.js`, 3 rotating variants per emotion). This endpoint can either keep serving from that same static table server-side, or the client can keep computing it locally and this endpoint can be skipped entirely.
 
-**Notes**: Question text is currently bundled client-side (`src/data/questions.js`, 3 rotating variants per emotion). This endpoint can either keep serving from that same static table server-side, or the client can keep computing it locally and this endpoint can be skipped entirely — current frontend already has a service function for it, so it's documented as a real endpoint, but it's a low-risk one to defer if the static file is judged sufficient long-term.
-
----
-
-### 7.2 Submit Daily Check-in
+#### 3.6.2 Submit Daily Check-in
 
 | | |
 |---|---|
-| **Endpoint** | `POST /checkin` |
+| **Endpoint** | `POST /checkin` *(confirm prefix per §1)* |
 | **Purpose** | Submits the day's 4 emotion scores and advances the user to the next day. |
 | **Auth** | Bearer Token |
 
@@ -674,7 +432,7 @@ Day pattern 3: enthusiasm, resilience, hope, contentment
 
 | Field | Type | Required | Validation | Description |
 |---|---|---|---|---|
-| `scores` | object | Yes | must contain exactly the 4 emotion ids for **today's** group (per §7.1), each 1–10 | |
+| `scores` | object | Yes | must contain exactly the 4 emotion ids for **today's** group, each 1–10 | |
 
 **Success Response — `200 OK`**
 ```json
@@ -687,10 +445,6 @@ Day pattern 3: enthusiasm, resilience, hope, contentment
 }
 ```
 
-| Field | Description |
-|---|---|
-| `nextDay` | The incremented day counter, stored server-side for the next `GET /checkin/today` call |
-
 **Error Responses**
 
 | Status | Meaning | Example |
@@ -700,21 +454,17 @@ Day pattern 3: enthusiasm, resilience, hope, contentment
 | `422` | Wrong emotion set for today, or out-of-range score | `{ "success": false, "message": "Validation failed", "code": "VALIDATION_ERROR", "errors": [{ "field": "scores", "message": "Expected scores for joy, gratitude, inspiration, focus" }] }` |
 | `500` | Server error | — |
 
-**Database Objects**: `User` (`currentDay` increment), `CheckInEntry` (type=`daily`, `dayNumber`), `EmotionScore` (×4)
-
 **Frontend Usage**: `DailyCheckInScreen.js`, fired once after the 4th prompt's "Finish Check-In".
 
 **Notes**: The current mock (`checkInService.js`) increments `currentDay` unconditionally with no "already checked in today" guard and no real date-based gating — a production backend should key this off calendar date (in the user's timezone) rather than trusting the client to only call it once per day.
 
 ---
 
-## 8. History
-
-### 8.1 Get History
+### 3.7 Get History
 
 | | |
 |---|---|
-| **Endpoint** | `GET /history` |
+| **Endpoint** | `GET /history` *(confirm prefix per §1)* |
 | **Purpose** | Returns every completed check-in (baseline + all daily entries), most recent first, for the History tab's timeline. |
 | **Auth** | Bearer Token |
 
@@ -751,13 +501,9 @@ Day pattern 3: enthusiasm, resilience, hope, contentment
 
 **Error Responses**: `401`, `500`.
 
-**Database Objects**: `CheckInEntry`, `EmotionScore`
-
 **Frontend Usage**: `src/screens/History/HistoryScreen.js` — computes each entry's average and score band **client-side** from the raw `scores` map; the backend does not need to pre-compute an average for this endpoint.
 
-**Caching**: Refetched on every screen mount, no client cache.
-
-**Pagination**: **Not implemented by the current frontend** — it renders the full array with no page/limit params and no infinite scroll. This is fine at low volume but will not scale as a user accumulates months of daily entries. Recommended (not required) addition:
+**Pagination**: **Not implemented by the current frontend** — it renders the full array with no page/limit params and no infinite scroll. Recommended (not required):
 ```
 GET /history?page=1&limit=20
 ```
@@ -765,20 +511,83 @@ GET /history?page=1&limit=20
 { "data": [ ], "pagination": { "page": 1, "limit": 20, "total": 187, "totalPages": 10 } }
 ```
 
-**Search & Filters**: Not implemented by the current frontend. A `type=daily|baseline` or date-range filter would be a reasonable future addition but is not required today.
+**Search & Filters**: Not implemented today. A `type=daily|baseline` or date-range filter would be a reasonable future addition.
 
 ---
 
-## 9. Onboarding — No Backend API
+### 3.8 Onboarding — No Backend API
 
-`OnboardingScreen` and `IntroductionScreen` are entirely local: "has onboarded" is a boolean flag in `AsyncStorage` (`momentum_has_onboarded`), never sent to the backend (`src/context/AuthContext.js`). There is no `/onboarding` endpoint to build. If Momentum's shared Aligna profile (roadmap §13) should eventually know whether a user has completed onboarding, the simplest path is adding an `hasOnboarded` boolean to the `User` record and the `GET /profile` / login response, rather than a dedicated endpoint — flagged here as an option, not a requirement.
+`OnboardingScreen` and `IntroductionScreen` are entirely local: "has onboarded" is a boolean flag in `AsyncStorage` (`momentum_has_onboarded`), never sent to the backend (`src/context/AuthContext.js`). There is no `/onboarding` endpoint to build. If Momentum's shared Aligna profile should eventually know whether a user has completed onboarding, the simplest path is adding an `hasOnboarded` boolean to the `User` record and the real `/user/profile` / login response, rather than a dedicated endpoint.
 
 ---
 
-## 10. Future / Recommended Additions (Not Required by Current Frontend)
+### 3.9 Score Emotion From Conversation
 
-These are not backed by any current frontend call site — do not build them speculatively, but they're worth the backend team knowing about since they're near-certain next steps:
+| | |
+|---|---|
+| **Endpoint** | `POST /assessment/emotion-score` *(confirm prefix per §1)* |
+| **Purpose** | Runs an AI judge over one emotion's voice/text check-in transcript and returns the 1–10 score for it. Called once per emotion, immediately after the user taps Continue on `ConversationScreen.js` — **not** once per full check-in. |
+| **Auth** | Bearer Token |
 
-- **`POST /auth/forgot-password`, `POST /auth/verify-otp`, `POST /auth/reset-password`** — `LoginScreen` has a "Forgot password?" link today, but it only shows a toast ("Password reset isn't available in this preview yet") and calls nothing.
-- **Refresh tokens** — the current auth model is a single long-lived bearer token with no rotation/refresh; `axios.js` treats any `401` as "log the user out." Production should likely add refresh-token support before launch.
-- **Shared Aligna profile sync** (roadmap §13) — cross-app data sharing with Lotus/TargetPro isn't reflected in this frontend at all today; it's a backend/platform concern layered on top of the `User`/`EmotionScore` tables below, not a Momentum-specific endpoint.
+**Background**: this replaced an earlier design where the ElevenLabs Conversational AI agent itself judged the exchange and called a `record_emotion_score` client tool mid-conversation (still documented in git history / `SYSTEM_PROMPT.md`'s prior revisions). That proved unreliable to get calling consistently — a tool call buried inside a live voice session is hard to debug when it silently doesn't happen. Moving the judgment to an ordinary REST call means the exact input (the transcript) and output (the score) can be logged and replayed like any other request.
+
+**Request Payload**:
+```json
+{
+  "emotionId": "confidence",
+  "checkInType": "baseline",
+  "transcript": [
+    { "source": "ai", "message": "Let's talk about confidence — how are you feeling about yourself lately?" },
+    { "source": "user", "message": "Honestly pretty solid, I spoke up in a meeting today and it felt good." }
+  ]
+}
+```
+
+| Field | Type | Required | Validation | Description |
+|---|---|---|---|---|
+| `emotionId` | string enum | Yes | One of the 12 emotion ids | Which emotion this transcript is about |
+| `checkInType` | enum | Yes | `"baseline"` \| `"daily"` | Lets the judge calibrate tone/depth expectations the same way `SYSTEM_PROMPT.md` did for the agent |
+| `transcript` | array | Yes | At least one `source: "user"` entry | Full exchange for this emotion only, in order, both sides |
+| `transcript[].source` | enum | Yes | `"user"` \| `"ai"` | Matches the ElevenLabs SDK's `onMessage` `source` field verbatim — see `ConversationScreen.js` |
+| `transcript[].message` | string | Yes | non-empty | The turn's text |
+
+**Success Response — `200 OK`**
+```json
+{
+  "success": true,
+  "data": {
+    "emotionId": "confidence",
+    "score": 7
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Meaning | Example |
+|---|---|---|
+| `401` | No/expired token | — |
+| `422` | Missing/empty transcript, no user turns, or unknown `emotionId` | `{ "success": false, "message": "Validation failed", "code": "VALIDATION_ERROR", "errors": [{ "field": "transcript", "message": "At least one user turn is required" }] }` |
+| `500` | Server error, or the judging model itself failed/timed out | — |
+
+**Suggested judging rubric** (moved here from `SYSTEM_PROMPT.md`'s former "How scores are assigned" section — this was written for the ElevenLabs agent to self-apply, and is preserved as a starting point for whatever prompts the backend's judging model):
+- **1–2 (very low)** — the emotion sounds largely absent, or the user uses explicitly negative/distressed language about this specific area.
+- **3–4 (low)** — mostly struggling or subdued, with only occasional or faint positive signal.
+- **5–6 (moderate)** — a mixed or middling picture: present but inconsistent, "okay," "so-so," some good and some not.
+- **7–8 (good/strong)** — clearly present and positively described, steady, several concrete positive signals.
+- **9–10 (very high)** — vivid, strongly positive language, described as consistently or exceptionally present.
+- If the user volunteers a number themselves in the transcript, treat it as one signal among several, not as ground truth.
+- No transcript signal strong enough to judge confidently should still resolve to a best-effort estimate (favor 5–6) rather than erroring — §3.4/§3.6.2 require a score for every emotion to submit a baseline/daily check-in, so this endpoint should not leave one out.
+
+**Frontend Usage**: `src/services/emotionService.js:scoreEmotionFromConversation()` ← `ConversationScreen.js`'s `handleContinue`. **Currently mocked** client-side with a placeholder keyword-count scorer (`estimateScoreFromTranscript`) since this backend endpoint doesn't exist yet — swap the mock body for a real `api.post(ENDPOINTS.ASSESSMENT.SCORE_EMOTION, ...)` call once it does; the function's signature and return shape already match this contract.
+
+**Notes**: Crisis/self-harm detection is intentionally **not** part of this endpoint's job — that still happens live, in-conversation, via the ElevenLabs agent's `flag_needs_support` client tool (`TOOLS_AND_APIS.md` §2.2), so the safety response isn't delayed by a network round trip after the fact.
+
+---
+
+## 4. Future / Recommended Additions (Not Required by Current Frontend)
+
+- **Refresh tokens** — the current auth model is a single long-lived bearer token with no rotation/refresh; `axios.js` has no `401` handling wired up at all right now (see §1's Error Envelope note). Production should add refresh-token support and re-enable the error interceptor before launch.
+- **Server-side logout** — see §3.1; the client-side call exists but is disabled, so no session is actually invalidated server-side today.
+- **Reconcile the emotion ID scheme** — see §1's warning; §3.3–§3.7 all assume string slugs, but the one real reference-data endpoint (§2) uses numeric ids. Settle this before building any of §3.3–§3.7 against real data.
+- **Shared Aligna profile sync** — cross-app data sharing with Lotus/TargetPro isn't reflected in this frontend at all today; it's a backend/platform concern layered on top of the `User`/`EmotionScore` tables, not a Momentum-specific endpoint.
