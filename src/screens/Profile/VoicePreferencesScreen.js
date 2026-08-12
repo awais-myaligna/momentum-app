@@ -8,7 +8,7 @@ import MenuRow from '../../components/MenuRow';
 import { useToast } from '../../context/ToastContext';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { getProfile, updateProfile } from '../../services/profileService';
+import { getUserProfile, updateUserProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
 // Roadmap section 12: prompts/feedback use the preferred voice and agent
@@ -26,7 +26,7 @@ const VoicePreferencesScreen = ({ navigation }) => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const data = await getProfile();
+      const data = await getUserProfile();
       setProfile(data);
     } catch {
       setHasError(true);
@@ -40,14 +40,14 @@ const VoicePreferencesScreen = ({ navigation }) => {
   }, [loadProfile]);
 
   const handleSelect = async (voice) => {
-    if (voice === profile.voice || isSaving) return;
-    const previous = profile.voice;
-    setProfile((prev) => ({ ...prev, voice }));
+    if (voice === profile.voice_gender || isSaving) return;
+    const previous = profile.voice_gender;
+    setProfile((prev) => ({ ...prev, voice_gender: voice }));
     setIsSaving(true);
     try {
-      await updateProfile({ voice });
+      await updateUserProfile({ voice_gender: voice });
     } catch (error) {
-      setProfile((prev) => ({ ...prev, voice: previous }));
+      setProfile((prev) => ({ ...prev, voice_gender: previous }));
       showToast(error?.message || 'Could not save your voice preference. Please try again.', {
         type: 'error',
       });
@@ -81,7 +81,7 @@ const VoicePreferencesScreen = ({ navigation }) => {
             label={voice}
             onPress={() => handleSelect(voice)}
             rightSlot={
-              voice === profile.voice ? (
+              voice === profile.voice_gender ? (
                 <Icon name={ICONS.COMPLETE} size={20} color={COLORS.primary} />
               ) : null
             }

@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 import api, { AUTH_TOKEN_KEY } from '../api/axios';
+import { ENDPOINTS } from '../api/endpoints';
 
 const AUTH_USER_KEY = 'momentum_auth_user';
 
@@ -109,9 +110,12 @@ export const resetPassword = async ({ email, token, password, password_confirmat
 
 export const logout = async () => {
   try {
-    // await api.post('/logout');
-    return { message: 'Logout api call has been skipped ' };
+    const response = await api.post(ENDPOINTS.AUTH.LOGOUT);
+    return { message: response?.message };
   } finally {
+    // Clear local session regardless of whether the server call succeeded —
+    // a failed/offline logout request shouldn't leave the user stuck signed
+    // in on this device.
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(AUTH_USER_KEY);
   }

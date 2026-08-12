@@ -8,7 +8,7 @@ import MenuRow from '../../components/MenuRow';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { PROFILE_ROUTES } from '../../navigation/routes';
-import { getProfile } from '../../services/profileService';
+import { getUserProfile } from '../../services/profileService';
 
 // Reloads on focus so returning from Notifications/Language/Voice
 // Preferences reflects any change made there.
@@ -21,7 +21,7 @@ const SettingsScreen = ({ navigation }) => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const data = await getProfile();
+      const data = await getUserProfile();
       setProfile(data);
     } catch {
       setHasError(true);
@@ -55,19 +55,19 @@ const SettingsScreen = ({ navigation }) => {
           <MenuRow
             icon={ICONS.NOTIFICATIONS}
             label="Notifications"
-            subtitle={profile.notificationsEnabled ? 'On' : 'Off'}
+            subtitle={profile.notifications_enabled ? 'On' : 'Off'}
             onPress={() => navigation.navigate(PROFILE_ROUTES.NOTIFICATIONS)}
           />
           <MenuRow
             icon={ICONS.LANGUAGE}
             label="Language"
-            subtitle={profile.language}
+            subtitle={profile.default_language}
             onPress={() => navigation.navigate(PROFILE_ROUTES.LANGUAGE)}
           />
           <MenuRow
             icon={ICONS.VOICE}
             label="Voice Preferences"
-            subtitle={profile.voice}
+            subtitle={profile.voice_gender}
             onPress={() => navigation.navigate(PROFILE_ROUTES.VOICE_PREFERENCES)}
           />
         </>

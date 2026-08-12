@@ -1,26 +1,16 @@
-import { EMOTIONS, getScoreBand } from '../data/emotions';
-import { mockStore } from '../mocks/mockStore';
-import { mockRequest } from '../utils/mockRequest';
+import api from '../api/axios';
+import { ENDPOINTS } from '../api/endpoints';
 
-export const getDashboard = () => {
-  const chart = EMOTIONS.map((emotion) => {
-    const score = mockStore.baselineScores[emotion.id] ?? 0;
-    const band = getScoreBand(score);
-    return {
-      emotionId: emotion.id,
-      name: emotion.name,
-      score,
-      color: band.color,
-    };
-  });
+// Aggregate endpoint: all 12 emotions' latest scores + rollup average +
+// current day counter (BACKEND_API_SPECIFICATION.md §B.4). Powers the home
+// summary and the full chart screen.
+export const getDashboard = async () => {
+  const response = await api.get(ENDPOINTS.DASHBOARD);
+  const data = response?.data;
 
-  const average =
-    chart.reduce((sum, item) => sum + item.score, 0) / (chart.length || 1);
+  if (!data) {
+    throw new Error(response?.message || 'Dashboard response missing data.');
+  }
 
-  return mockRequest({
-    hasCompletedBaseline: mockStore.hasCompletedBaseline,
-    chart,
-    averageScore: Math.round(average * 10) / 10,
-    currentDay: mockStore.currentDay,
-  });
+  return data;
 };

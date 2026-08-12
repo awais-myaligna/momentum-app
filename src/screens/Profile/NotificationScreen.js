@@ -8,7 +8,7 @@ import MenuRow from '../../components/MenuRow';
 import { useToast } from '../../context/ToastContext';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { getProfile, updateProfile } from '../../services/profileService';
+import { getUserProfile, updateUserProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
 const NotificationScreen = ({ navigation }) => {
@@ -22,7 +22,7 @@ const NotificationScreen = ({ navigation }) => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const data = await getProfile();
+      const data = await getUserProfile();
       setProfile(data);
     } catch {
       setHasError(true);
@@ -36,12 +36,12 @@ const NotificationScreen = ({ navigation }) => {
   }, [loadProfile]);
 
   const handleToggle = async (nextValue) => {
-    setProfile((prev) => ({ ...prev, notificationsEnabled: nextValue }));
+    setProfile((prev) => ({ ...prev, notifications_enabled: nextValue }));
     setIsSaving(true);
     try {
-      await updateProfile({ notificationsEnabled: nextValue });
+      await updateUserProfile({ notifications_enabled: nextValue });
     } catch (error) {
-      setProfile((prev) => ({ ...prev, notificationsEnabled: !nextValue }));
+      setProfile((prev) => ({ ...prev, notifications_enabled: !nextValue }));
       showToast(error?.message || 'Could not save your preference. Please try again.', {
         type: 'error',
       });
@@ -72,10 +72,10 @@ const NotificationScreen = ({ navigation }) => {
           <MenuRow
             icon={ICONS.NOTIFICATIONS}
             label="Daily Check-In Reminders"
-            subtitle={profile.notificationsEnabled ? 'On' : 'Off'}
+            subtitle={profile.notifications_enabled ? 'On' : 'Off'}
             rightSlot={
               <Switch
-                value={profile.notificationsEnabled}
+                value={profile.notifications_enabled}
                 onValueChange={handleToggle}
                 disabled={isSaving}
                 trackColor={{ false: COLORS.gray300, true: COLORS.primary }}

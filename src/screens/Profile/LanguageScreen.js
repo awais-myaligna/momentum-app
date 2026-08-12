@@ -8,7 +8,7 @@ import MenuRow from '../../components/MenuRow';
 import { useToast } from '../../context/ToastContext';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { getProfile, updateProfile } from '../../services/profileService';
+import { getUserProfile, updateUserProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
 // Roadmap section 12: Momentum delivers prompts and feedback in the user's
@@ -26,7 +26,7 @@ const LanguageScreen = ({ navigation }) => {
     setIsLoading(true);
     setHasError(false);
     try {
-      const data = await getProfile();
+      const data = await getUserProfile();
       setProfile(data);
     } catch {
       setHasError(true);
@@ -40,14 +40,14 @@ const LanguageScreen = ({ navigation }) => {
   }, [loadProfile]);
 
   const handleSelect = async (language) => {
-    if (language === profile.language || isSaving) return;
-    const previous = profile.language;
-    setProfile((prev) => ({ ...prev, language }));
+    if (language === profile.default_language || isSaving) return;
+    const previous = profile.default_language;
+    setProfile((prev) => ({ ...prev, default_language: language }));
     setIsSaving(true);
     try {
-      await updateProfile({ language });
+      await updateUserProfile({ default_language: language });
     } catch (error) {
-      setProfile((prev) => ({ ...prev, language: previous }));
+      setProfile((prev) => ({ ...prev, default_language: previous }));
       showToast(error?.message || 'Could not save your language. Please try again.', {
         type: 'error',
       });
@@ -78,7 +78,7 @@ const LanguageScreen = ({ navigation }) => {
             label={language}
             onPress={() => handleSelect(language)}
             rightSlot={
-              language === profile.language ? (
+              language === profile.default_language ? (
                 <Icon name={ICONS.COMPLETE} size={20} color={COLORS.primary} />
               ) : null
             }

@@ -1,35 +1,29 @@
-import { getGroupForDay, getQuestionRotationForDay } from '../data/dailyCheckInSchedule';
-import { getEmotionById } from '../data/emotions';
-import { getDailyQuestion } from '../data/questions';
-import { mockStore } from '../mocks/mockStore';
-import { mockRequest } from '../utils/mockRequest';
+import api from '../api/axios';
+import { ENDPOINTS } from '../api/endpoints';
 
-export const getTodayCheckIn = () => {
-  const dayNumber = mockStore.currentDay;
-  const group = getGroupForDay(dayNumber);
-  const rotation = getQuestionRotationForDay(dayNumber);
+// Returns the current day's 4-emotion rotation with that rotation's
+// questions (BACKEND_API_SPECIFICATION.md §B.5). `alreadyCheckedInToday` is
+// used by DailyCheckInScreen to show a completed state instead of the form.
+export const getTodayCheckIn = async () => {
+  const response = await api.get(ENDPOINTS.CHECKIN.TODAY);
+  const data = response?.data;
 
-  const prompts = group.map((emotionId) => ({
-    emotionId,
-    emotionName: getEmotionById(emotionId).name,
-    question: getDailyQuestion(emotionId, rotation),
-  }));
+  if (!data || !Array.isArray(data.prompts)) {
+    throw new Error(response?.message || "Today's check-in response missing data.");
+  }
 
-  return mockRequest({ dayNumber, prompts });
+  return data;
 };
 
-export const submitDailyCheckIn = (answers) => {
-  const dayNumber = mockStore.currentDay;
+// Submits the day's 4 scores, advances to the next day (§B.6). Resolves to
+// `{ nextDay }`.
+export const submitDailyCheckIn = async (scores) => {
+  const response = await api.post(ENDPOINTS.CHECKIN.SUBMIT, { scores });
+  const data = response?.data;
 
-  mockStore.baselineScores = { ...mockStore.baselineScores, ...answers };
-  mockStore.history.push({
-    id: `entry-day${dayNumber}-${Date.now()}`,
-    date: new Date().toISOString(),
-    dayNumber,
-    scores: { ...answers },
-    type: 'daily',
-  });
-  mockStore.currentDay += 1;
+  if (!data) {
+    throw new Error(response?.message || 'Check-in submission response missing data.');
+  }
 
-  return mockRequest({ success: true, nextDay: mockStore.currentDay }, { delay: 800 });
+  return data;
 };

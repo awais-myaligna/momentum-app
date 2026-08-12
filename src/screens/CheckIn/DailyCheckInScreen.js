@@ -105,15 +105,15 @@ const DailyCheckInScreen = () => {
     );
   }
 
-  if (completedDay != null) {
+  if (completedDay != null || checkIn.alreadyCheckedInToday) {
     return (
       <ScreenWrapper>
         <View className="flex-1 items-center justify-center">
           <Icon name={ICONS.COMPLETE} size={56} color={COLORS.success} />
           <Text className="mt-4 text-center text-2xl font-bold text-text">Nice work!</Text>
           <Text className="mt-3 text-center text-base leading-6 text-textSecondary">
-            Day {completedDay} is logged on your chart. We&apos;ll check in again tomorrow, or at
-            your next session.
+            Day {completedDay ?? checkIn.dayNumber} is logged on your chart. We&apos;ll check in
+            again tomorrow, or at your next session.
           </Text>
           <Text className="mt-4 text-center text-sm leading-5 text-textSecondary">
             If you miss a day, that&apos;s okay — just pick up where you left off.

@@ -1,5 +1,7 @@
-// The 12 core emotional states tracked by Momentum.
-// `id` is the stable identifier used across mocks, storage, and charts.
+// The 12 core emotional states tracked by Momentum. Bundled client-side
+// reference copy — matches the live `GET /momentum/emotions` order/icons
+// 1:1, used for local icon/order lookups without a network round trip.
+// `id` is the stable identifier used across storage and charts.
 // `icon` is an Ionicons glyph name (see src/components/Icon.js).
 export const EMOTIONS = [
   {

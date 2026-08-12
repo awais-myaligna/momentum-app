@@ -14,8 +14,9 @@ export const ERROR_MESSAGES = {
   [ERROR_TYPES.UNKNOWN]: 'Something went wrong. Please try again.',
 };
 
-export const createApiError = (type, message, original) => ({
+export const createApiError = (type, message, original, extra = {}) => ({
   type,
   message: message || ERROR_MESSAGES[type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN],
   original,
+  ...extra,
 });

@@ -31,23 +31,27 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
   (response) => response.data,
-  // (error) => {
-  //   if (!error.response) {
-  //     if (error.code === 'ECONNABORTED') {
-  //       return Promise.reject(createApiError(ERROR_TYPES.TIMEOUT, undefined, error));
-  //     }
-  //     return Promise.reject(createApiError(ERROR_TYPES.OFFLINE, undefined, error));
-  //   }
+  (error) => {
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED') {
+        return Promise.reject(createApiError(ERROR_TYPES.TIMEOUT, undefined, error));
+      }
+      return Promise.reject(createApiError(ERROR_TYPES.OFFLINE, undefined, error));
+    }
 
-  //   const { status, data } = error.response;
-  //   if (status === 401) {
-  //     return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, data?.message, error));
-  //   }
-  //   if (status >= 500) {
-  //     return Promise.reject(createApiError(ERROR_TYPES.SERVER, data?.message, error));
-  //   }
-  //   return Promise.reject(createApiError(ERROR_TYPES.UNKNOWN, data?.message, error));
-  // }
+    // Backend envelope: { success: false, message, code, errors? } — surface
+    // the real message/code so callers (services/screens) show what the
+    // backend actually said instead of Axios's generic status-code text.
+    const { status, data } = error.response;
+    const extra = { code: data?.code, errors: data?.errors };
+    if (status === 401) {
+      return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, data?.message, error, extra));
+    }
+    if (status >= 500) {
+      return Promise.reject(createApiError(ERROR_TYPES.SERVER, data?.message, error, extra));
+    }
+    return Promise.reject(createApiError(ERROR_TYPES.UNKNOWN, data?.message, error, extra));
+  }
 );
 
 export default axiosInstance;

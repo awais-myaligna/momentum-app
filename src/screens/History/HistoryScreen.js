@@ -6,7 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import Icon from '../../components/Icon';
 import Loading from '../../components/Loading';
 import { ICONS } from '../../constants/icons';
-import { getEmotionById, getScoreBand } from '../../data/emotions';
+import { getEmotionById } from '../../data/emotions';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { getHistory } from '../../services/historyService';
 import { COLORS } from '../../styles/colors';
@@ -71,9 +71,6 @@ const HistoryScreen = () => {
       ) : (
         history.map((entry) => {
           const emotionIds = Object.keys(entry.scores);
-          const average =
-            emotionIds.reduce((sum, id) => sum + entry.scores[id], 0) / (emotionIds.length || 1);
-          const band = getScoreBand(Math.round(average));
 
           return (
             <Card key={entry.id} className="mb-3">
@@ -86,8 +83,8 @@ const HistoryScreen = () => {
                     {formatDate(entry.date)}
                   </Text>
                 </View>
-                <Text className={`text-lg font-bold ${BAND_TEXT_CLASS[band.color]}`}>
-                  {Math.round(average * 10) / 10}/10
+                <Text className={`text-lg font-bold ${BAND_TEXT_CLASS[entry.band]}`}>
+                  {entry.averageScore}/10
                 </Text>
               </View>
 
