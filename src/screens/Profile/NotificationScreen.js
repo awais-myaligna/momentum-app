@@ -1,47 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Switch, Text } from 'react-native';
 
 import EmptyState from '../../components/EmptyState';
 import Header from '../../components/Header';
-import Loading from '../../components/Loading';
 import MenuRow from '../../components/MenuRow';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { getUserProfile, updateUserProfile } from '../../services/profileService';
+import { updateUserProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
+// Reads/writes through AuthContext's `user` instead of calling Get Profile
+// on every open — see EditProfileScreen for the same pattern.
 const NotificationScreen = ({ navigation }) => {
+  const { user, updateUser, refreshUser } = useAuth();
   const { showToast } = useToast();
-  const [profile, setProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    setIsLoading(true);
-    setHasError(false);
-    try {
-      const data = await getUserProfile();
-      setProfile(data);
-    } catch {
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
-
   const handleToggle = async (nextValue) => {
-    setProfile((prev) => ({ ...prev, notifications_enabled: nextValue }));
     setIsSaving(true);
     try {
-      await updateUserProfile({ notifications_enabled: nextValue });
+      const { user: updatedUser } = await updateUserProfile({ notifications_enabled: nextValue });
+      await updateUser(updatedUser);
     } catch (error) {
-      setProfile((prev) => ({ ...prev, notifications_enabled: !nextValue }));
       showToast(error?.message || 'Could not save your preference. Please try again.', {
         type: 'error',
       });
@@ -57,25 +39,23 @@ const NotificationScreen = ({ navigation }) => {
         onBack={navigation.canGoBack() ? navigation.goBack : undefined}
       />
 
-      {isLoading ? (
-        <Loading skeleton skeletonRows={2} />
-      ) : hasError || !profile ? (
+      {!user ? (
         <EmptyState
           icon={ICONS.ERROR}
           title="Couldn't load notifications"
           description="Something went wrong loading your preferences."
           actionLabel="Retry"
-          onAction={loadProfile}
+          onAction={refreshUser}
         />
       ) : (
         <>
           <MenuRow
             icon={ICONS.NOTIFICATIONS}
             label="Daily Check-In Reminders"
-            subtitle={profile.notifications_enabled ? 'On' : 'Off'}
+            subtitle={user.notifications_enabled ? 'On' : 'Off'}
             rightSlot={
               <Switch
-                value={profile.notifications_enabled}
+                value={user.notifications_enabled}
                 onValueChange={handleToggle}
                 disabled={isSaving}
                 trackColor={{ false: COLORS.gray300, true: COLORS.primary }}

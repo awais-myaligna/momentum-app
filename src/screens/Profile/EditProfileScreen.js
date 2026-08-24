@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform, Text, TouchableOpacity, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -7,13 +7,12 @@ import EmptyState from '../../components/EmptyState';
 import Header from '../../components/Header';
 import Icon from '../../components/Icon';
 import Input from '../../components/Input';
-import Loading from '../../components/Loading';
 import Modal from '../../components/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { getUserProfile, updateUserProfile } from '../../services/profileService';
+import { updateUserProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
 const GENDERS = ['male', 'female', 'other'];
@@ -123,35 +122,31 @@ const DateField = ({ label, value, onChange }) => {
   );
 };
 
-// Fetches the live profile on open, renders it as editable fields, and
-// PUTs only the fields the user actually changed on Save.
+// Reads the current user straight from AuthContext (populated at
+// login/register/session-restore — see AuthContext's bootstrap) instead of
+// calling Get Profile on every open. PUTs only the fields the user actually
+// changed on Save, then pushes the backend's returned user back into
+// AuthContext so every screen reading `user` picks up the edit immediately.
 const EditProfileScreen = ({ navigation }) => {
-  const { updateUser } = useAuth();
+  const { user, updateUser, refreshUser } = useAuth();
   const { showToast } = useToast();
-  const [form, setForm] = useState(null);
-  const [initialForm, setInitialForm] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [form, setForm] = useState(() => (user ? pickEditableFields(user) : null));
+  const [initialForm, setInitialForm] = useState(() => (user ? pickEditableFields(user) : null));
   const [isSaving, setIsSaving] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    setIsLoading(true);
-    setHasError(false);
+  // Only hit the network here if this screen was somehow reached without a
+  // user already in context (e.g. bootstrap's profile fetch failed offline)
+  // — the normal path never calls this.
+  const recoverProfile = async () => {
     try {
-      const user = await getUserProfile();
-      const editable = pickEditableFields(user);
+      const freshUser = await refreshUser();
+      const editable = pickEditableFields(freshUser);
       setForm(editable);
       setInitialForm(editable);
     } catch {
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
+      // stays on the empty state; user can retry again
     }
-  }, []);
-
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+  };
 
   const setField = (key) => (value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -168,14 +163,11 @@ const EditProfileScreen = ({ navigation }) => {
 
     setIsSaving(true);
     try {
-      const { message, user } = await updateUserProfile(changes);
-      const editable = pickEditableFields(user);
+      const { message, user: updatedUser } = await updateUserProfile(changes);
+      const editable = pickEditableFields(updatedUser);
       setForm(editable);
       setInitialForm(editable);
-      await updateUser({
-        name: [user.first_name, user.last_name].filter(Boolean).join(' '),
-        email: user.email,
-      });
+      await updateUser(updatedUser);
       showToast(message || 'Profile updated', { type: 'success' });
     } catch (error) {
       showToast(error?.message || 'Could not update your profile. Please try again.', { type: 'error' });
@@ -188,15 +180,13 @@ const EditProfileScreen = ({ navigation }) => {
     <ScreenWrapper scroll>
       <Header title="Edit Profile" onBack={navigation.canGoBack() ? navigation.goBack : undefined} />
 
-      {isLoading ? (
-        <Loading skeleton skeletonRows={6} />
-      ) : hasError || !form ? (
+      {!form ? (
         <EmptyState
           icon={ICONS.ERROR}
           title="Couldn't load your profile"
           description="Something went wrong loading your details."
           actionLabel="Retry"
-          onAction={loadProfile}
+          onAction={recoverProfile}
         />
       ) : (
         <>

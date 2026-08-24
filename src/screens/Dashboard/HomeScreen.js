@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 import Avatar from '../../components/Avatar';
 import Card from '../../components/Card';
@@ -31,6 +32,12 @@ const HomeScreen = ({ navigation }) => {
   const [dashboard, setDashboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  // The Home tab stays mounted once visited (React Navigation doesn't
+  // unmount inactive tab screens), so a mount-only fetch never sees a check-in
+  // submitted afterwards from the Check-In tab. Track whether we've ever
+  // loaded successfully so re-focusing refetches quietly in the background
+  // instead of only fetching once for the screen's lifetime.
+  const hasLoadedRef = useRef(false);
 
   const userName = user?.name || user?.first_name || 'User';
   const userAvatar =
@@ -42,21 +49,32 @@ const HomeScreen = ({ navigation }) => {
     user?.photo;
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
+    const isFirstLoad = !hasLoadedRef.current;
+    if (isFirstLoad) {
+      setIsLoading(true);
+    }
     setHasError(false);
     try {
       const dashboardData = await getDashboard();
       setDashboard(dashboardData);
+      hasLoadedRef.current = true;
     } catch {
       setHasError(true);
     } finally {
-      setIsLoading(false);
+      if (isFirstLoad) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Refetch every time this tab gains focus (first mount included) so stats
+  // submitted from the Check-In tab show up immediately on switching back,
+  // without requiring a manual pull-to-refresh or app reload.
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const goToEmotionDetail = (emotionId) => {
     navigation.navigate(HOME_ROUTES.EMOTION_DETAIL, { emotionId });

@@ -151,7 +151,10 @@ const DailyCheckInScreen = () => {
         <Text className="ml-2 text-2xl font-bold text-text">Today&apos;s Check-In</Text>
       </View>
 
-      <QuestionCard emotionName={prompt.emotionName} question={prompt.question}>
+      <QuestionCard
+        emotionName={prompt.emotionName}
+        question={prompt.question}
+        audioSource={prompt.audioUrl ? { uri: prompt.audioUrl } : undefined}>
         <ScoreSlider
           value={draftScore}
           onChange={setDraftScore}

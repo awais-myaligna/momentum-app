@@ -1,53 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import EmptyState from '../../components/EmptyState';
 import Header from '../../components/Header';
 import Icon from '../../components/Icon';
-import Loading from '../../components/Loading';
 import MenuRow from '../../components/MenuRow';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { ICONS } from '../../constants/icons';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
-import { getUserProfile, updateUserProfile } from '../../services/profileService';
+import { updateUserProfile } from '../../services/profileService';
 import { COLORS } from '../../styles/colors';
 
 // Roadmap section 12: Momentum delivers prompts and feedback in the user's
 // chosen language.
 const LANGUAGES = ['English', 'Spanish', 'French', 'Portuguese'];
 
+// Reads/writes through AuthContext's `user` (populated at login/session
+// restore) instead of calling Get Profile on every open — see
+// EditProfileScreen for the same pattern.
 const LanguageScreen = ({ navigation }) => {
+  const { user, updateUser, refreshUser } = useAuth();
   const { showToast } = useToast();
-  const [profile, setProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    setIsLoading(true);
-    setHasError(false);
-    try {
-      const data = await getUserProfile();
-      setProfile(data);
-    } catch {
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
-
   const handleSelect = async (language) => {
-    if (language === profile.default_language || isSaving) return;
-    const previous = profile.default_language;
-    setProfile((prev) => ({ ...prev, default_language: language }));
+    if (language === user?.default_language || isSaving) return;
     setIsSaving(true);
     try {
-      await updateUserProfile({ default_language: language });
+      const { user: updatedUser } = await updateUserProfile({ default_language: language });
+      await updateUser(updatedUser);
     } catch (error) {
-      setProfile((prev) => ({ ...prev, default_language: previous }));
       showToast(error?.message || 'Could not save your language. Please try again.', {
         type: 'error',
       });
@@ -60,15 +42,13 @@ const LanguageScreen = ({ navigation }) => {
     <ScreenWrapper>
       <Header title="Language" onBack={navigation.canGoBack() ? navigation.goBack : undefined} />
 
-      {isLoading ? (
-        <Loading skeleton skeletonRows={4} />
-      ) : hasError || !profile ? (
+      {!user ? (
         <EmptyState
           icon={ICONS.ERROR}
           title="Couldn't load languages"
           description="Something went wrong loading your preferences."
           actionLabel="Retry"
-          onAction={loadProfile}
+          onAction={refreshUser}
         />
       ) : (
         LANGUAGES.map((language) => (
@@ -78,7 +58,7 @@ const LanguageScreen = ({ navigation }) => {
             label={language}
             onPress={() => handleSelect(language)}
             rightSlot={
-              language === profile.default_language ? (
+              language === user.default_language ? (
                 <Icon name={ICONS.COMPLETE} size={20} color={COLORS.primary} />
               ) : null
             }

@@ -34,18 +34,14 @@ const ProfileScreen = ({ navigation }) => {
     <ScreenWrapper scroll>
       <View className="mb-6 mt-2 items-center">
         <Avatar
-          name={user?.name}
+          name={user?.first_name}
           uri={
             user?.avatar ||
-            user?.avatar_url ||
-            user?.avatarUrl ||
-            user?.profile_picture ||
-            user?.image ||
-            user?.photo
+            user?.avatar_url 
           }
           size="xl"
         />
-        <Text className="mt-3 text-xl font-bold text-text">{user?.name}</Text>
+        <Text className="mt-3 text-xl font-bold text-text">{user?.first_name} {user?.last_name}</Text>
         <Text className="mt-0.5 text-sm text-textSecondary">{user?.email}</Text>
       </View>
 

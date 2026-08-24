@@ -17,12 +17,43 @@ const axiosInstance = axios.create({
   },
 });
 
+// Dev-only request/response logging — every call through this instance
+// passes through here, so nothing per-service is needed. Stripped in
+// production builds via the __DEV__ guard.
+const logRequest = (config) => {
+  if (!__DEV__) return;
+  const fullPath = `${config.baseURL || ''}${config.url}`;
+  // eslint-disable-next-line no-console
+  console.log(`[API →] ${config.method?.toUpperCase()} ${fullPath}`, {
+    payload: config.data,
+    params: config.params,
+  });
+};
+
+const logResponse = (response) => {
+  if (!__DEV__) return;
+  const fullPath = `${response.config?.baseURL || ''}${response.config?.url}`;
+  // eslint-disable-next-line no-console
+  console.log(`[API ✓] ${response.config?.method?.toUpperCase()} ${fullPath} (${response.status})`, response.data);
+};
+
+const logError = (error) => {
+  if (!__DEV__) return;
+  const fullPath = `${error.config?.baseURL || ''}${error.config?.url}`;
+  // eslint-disable-next-line no-console
+  console.log(
+    `[API ✗] ${error.config?.method?.toUpperCase()} ${fullPath} (${error.response?.status ?? 'no response'})`,
+    error.response?.data ?? error.message
+  );
+};
+
 axiosInstance.interceptors.request.use(
   async (config) => {
     const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    logRequest(config);
     return config;
   },
   (error) =>
@@ -30,8 +61,13 @@ axiosInstance.interceptors.request.use(
 );
 
 axiosInstance.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    logResponse(response);
+    return response.data;
+  },
   (error) => {
+    logError(error);
+
     if (!error.response) {
       if (error.code === 'ECONNABORTED') {
         return Promise.reject(createApiError(ERROR_TYPES.TIMEOUT, undefined, error));
