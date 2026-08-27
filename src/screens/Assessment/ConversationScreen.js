@@ -12,7 +12,7 @@ import { useToast } from '../../context/ToastContext';
 import { BASELINE_QUESTIONS } from '../../data/questions';
 import ScreenWrapper from '../../layouts/ScreenWrapper';
 import { ASSESSMENT_ROUTES } from '../../navigation/routes';
-import { scoreEmotionFromConversation, submitAssessment } from '../../services/emotionService';
+import { scoreEmotionFromConversation } from '../../services/emotionService';
 import { COLORS } from '../../styles/colors';
 
 const AGENT_ID = process.env.EXPO_PUBLIC_AGENT_ID;
@@ -43,7 +43,7 @@ const AGENT_ID = process.env.EXPO_PUBLIC_AGENT_ID;
 //  - 'unavailable' — no AGENT_ID configured, or both the voice and text
 //                 connection attempts failed; offers Retry only.
 const ConversationScreen = ({ navigation }) => {
-  const { currentEmotion, currentIndex, emotions, isLastEmotion, progress, recordScore, advanceToNextEmotion } =
+  const { currentEmotion, currentIndex, emotions, isLastEmotion, progress, applyScoreResult } =
     useAssessment();
   const { showToast } = useToast();
   const question = BASELINE_QUESTIONS[currentEmotion.id];
@@ -57,7 +57,6 @@ const ConversationScreen = ({ navigation }) => {
 
   const startedForEmotion = useRef(null);
   const attemptRef = useRef(AGENT_ID ? 'voice' : 'failed');
-  const answersRef = useRef({});
 
   const getDynamicVariables = () => ({
     emotionId: currentEmotion.id,
@@ -187,26 +186,15 @@ const ConversationScreen = ({ navigation }) => {
 
     setIsProcessing(true);
     try {
-      const { score } = await scoreEmotionFromConversation(currentEmotion.id, transcript);
-      answersRef.current = recordScore(currentEmotion.id, score);
+      // Scores AND persists this emotion's result as part of the user's
+      // baseline progress — the emotion isn't considered complete until
+      // this resolves, so a failure here leaves the user free to just tap
+      // Continue again rather than losing the answer.
+      const result = await scoreEmotionFromConversation(currentEmotion.id, transcript);
+      const { done } = applyScoreResult(result);
+      navigation.replace(done ? ASSESSMENT_ROUTES.BASELINE_COMPLETION : ASSESSMENT_ROUTES.CONVERSATION);
     } catch (error) {
       showToast(error?.message || "Couldn't score that check-in. Please try again.", { type: 'error' });
-      setIsProcessing(false);
-      return;
-    }
-
-    if (!isLastEmotion) {
-      advanceToNextEmotion();
-      navigation.replace(ASSESSMENT_ROUTES.CONVERSATION);
-      setIsProcessing(false);
-      return;
-    }
-
-    try {
-      await submitAssessment(answersRef.current);
-      navigation.replace(ASSESSMENT_ROUTES.BASELINE_COMPLETION);
-    } catch (error) {
-      showToast(error?.message || 'Could not save your check-in. Please try again.', { type: 'error' });
     } finally {
       setIsProcessing(false);
     }

@@ -17,8 +17,8 @@ export const ENDPOINTS = {
     DETAIL: (slug) => `/momentum/emotions/${slug}`,
   },
   ASSESSMENT: {
-    SUBMIT_BASELINE: '/momentum/assessment/baseline',
     SCORE_EMOTION: '/momentum/assessment/emotion-score',
+    BASELINE_PROGRESS: '/momentum/assessment/baseline/progress',
   },
   DASHBOARD: '/momentum/dashboard',
   CHECKIN: {
