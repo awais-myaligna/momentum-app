@@ -23,7 +23,7 @@
       "@react-native-community/datetimepicker"
     ],
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon_momentum.png",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
@@ -39,8 +39,8 @@
     "android": {
       "package": "com.momentum.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icon_momentum.png",
+        "backgroundColor": "#2391FF"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",

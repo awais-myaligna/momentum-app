@@ -48,15 +48,41 @@ export const scoreEmotionFromConversation = async (emotionId, transcript, checkI
 // of truth — this is called every time the baseline flow is entered/resumed,
 // not read from local storage. Resolves to
 // `{ completed, totalEmotions, completedEmotions, nextEmotion, emotions }`.
+//
+// For brand-new users the backend may return a 404 or an empty/null record
+// because no progress row exists yet — in that case we return a safe
+// default so AssessmentContext starts from emotion 0 instead of showing the
+// error gate and blocking the flow entirely.
 export const getBaselineProgress = async () => {
-  const response = await api.get(ENDPOINTS.ASSESSMENT.BASELINE_PROGRESS);
-  const data = response?.data;
+  const EMPTY_PROGRESS = {
+    completed: false,
+    totalEmotions: 12,
+    completedEmotions: 0,
+    nextEmotion: null,
+    emotions: [],
+  };
 
-  if (!data || !Array.isArray(data.emotions)) {
-    throw new Error(response?.message || 'Baseline progress response missing data.');
+  try {
+    const response = await api.get(ENDPOINTS.ASSESSMENT.BASELINE_PROGRESS);
+    const data = response?.data;
+
+    if (!data || !Array.isArray(data.emotions)) {
+      // Backend returned an unexpected shape (no progress record yet for
+      // new users) — start from the beginning.
+      return EMPTY_PROGRESS;
+    }
+
+    return data;
+  } catch (err) {
+    // A 404 means the backend hasn't created a progress record yet —
+    // treat it as a clean slate rather than a fatal error. Any other
+    // error type (network, 5xx) is re-thrown so the caller can show
+    // the appropriate error state.
+    if (err?.original?.response?.status === 404) {
+      return EMPTY_PROGRESS;
+    }
+    throw err;
   }
-
-  return data;
 };
 
 // One emotion's metadata plus the current user's latest score, band, and

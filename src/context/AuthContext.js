@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { setUnauthorizedHandler } from '../api/axios';
 import {
   login as loginRequest,
   logout as logoutRequest,
@@ -10,6 +11,7 @@ import {
   setStoredUser,
 } from '../services/authService';
 import { getUserProfile } from '../services/profileService';
+import { ERROR_TYPES } from '../utils/apiError';
 
 const AuthContext = createContext(null);
 
@@ -26,6 +28,10 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasCompletedBaseline, setHasCompletedBaseline] = useState(false);
   const [user, setUser] = useState(null);
+
+  // Keep a stable ref to logout so the 401 handler registered below never
+  // captures a stale closure — it always calls whatever logout is at call time.
+  const logoutRef = useRef(null);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -55,9 +61,15 @@ export const AuthProvider = ({ children }) => {
           setUser(freshUser);
           setHasCompletedBaseline(Boolean(freshUser?.hasCompletedBaseline));
           await setStoredUser(freshUser);
-        } catch {
-          // Offline / expired token / backend hiccup — keep the cached
-          // value already applied above instead of blocking startup.
+        } catch (err) {
+          if (err?.type === ERROR_TYPES.UNAUTHORIZED) {
+            // Token is expired or revoked — clear the session immediately
+            // instead of keeping a stale token that will cause every
+            // subsequent API call to fail with 401.
+            await logoutRef.current?.();
+          }
+          // Offline / backend hiccup — keep the cached value already
+          // applied above instead of blocking startup.
         }
       }
 
@@ -94,6 +106,18 @@ export const AuthProvider = ({ children }) => {
     setHasCompletedBaseline(false);
     setUser(null);
   }, []);
+
+  // Keep the ref in sync with the callback so bootstrap and the global 401
+  // handler always have access to the latest version without re-registering.
+  logoutRef.current = logout;
+
+  // Register logout as the global 401 handler immediately after it's
+  // defined — any API call that returns 401 (expired / revoked token)
+  // will automatically trigger a full session clear + redirect to login.
+  useEffect(() => {
+    setUnauthorizedHandler(logout);
+    return () => setUnauthorizedHandler(null);
+  }, [logout]);
 
   // Manual escape hatch for the rare case a screen renders before `user` is
   // populated (e.g. bootstrap's profile fetch failed while offline) — every

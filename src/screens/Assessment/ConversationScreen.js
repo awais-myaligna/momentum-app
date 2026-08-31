@@ -57,6 +57,7 @@ const ConversationScreen = ({ navigation }) => {
 
   const startedForEmotion = useRef(null);
   const attemptRef = useRef(AGENT_ID ? 'voice' : 'failed');
+  const isMountedRef = useRef(true);
 
   const getDynamicVariables = () => ({
     emotionId: currentEmotion.id,
@@ -88,19 +89,28 @@ const ConversationScreen = ({ navigation }) => {
     clientTools,
     micMuted: mode === 'textChat',
     onMessage: ({ message, source }) => {
+      if (!isMountedRef.current) return;
       setTranscript((prev) => [...prev, { id: `${source}-${prev.length}`, message, source }]);
     },
     onError: () => {
+      if (!isMountedRef.current) return;
       if (attemptRef.current === 'voice') {
+        // Switch to text mode first, then retry the session after a short
+        // delay so the ElevenLabs SDK has time to fully tear down the
+        // failed voice session before we open a new one.
         attemptRef.current = 'text';
         setMode('textChat');
         showToast("Voice check-in isn't available right now — continuing by text.", { type: 'error' });
-        try {
-          conversation.startSession({ agentId: AGENT_ID, dynamicVariables: getDynamicVariables() });
-        } catch {
-          attemptRef.current = 'failed';
-          setMode('unavailable');
-        }
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          try {
+            conversation.startSession({ agentId: AGENT_ID, dynamicVariables: getDynamicVariables() });
+          } catch {
+            if (!isMountedRef.current) return;
+            attemptRef.current = 'failed';
+            setMode('unavailable');
+          }
+        }, 500);
       } else {
         attemptRef.current = 'failed';
         setMode('unavailable');
@@ -128,11 +138,13 @@ const ConversationScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     if (startedForEmotion.current === currentEmotion.id) return;
     startedForEmotion.current = currentEmotion.id;
     startForCurrentEmotion();
 
     return () => {
+      isMountedRef.current = false;
       try {
         conversation.endSession();
       } catch {

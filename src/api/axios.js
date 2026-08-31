@@ -4,6 +4,14 @@ import * as SecureStore from 'expo-secure-store';
 import { createApiError, ERROR_TYPES } from '../utils/apiError';
 
 export const AUTH_TOKEN_KEY = 'momentum_auth_token';
+
+// Global 401 handler — registered by AuthContext on mount so that any
+// expired/revoked token detected anywhere in the app triggers a full logout
+// without every individual service/screen needing to handle it themselves.
+let _onUnauthorized = null;
+export const setUnauthorizedHandler = (fn) => {
+  _onUnauthorized = fn;
+};
 const BASE_URL = 'https://devapi.myaligna.com/api';
 const REQUEST_TIMEOUT = 15000;
 
@@ -81,6 +89,10 @@ axiosInstance.interceptors.response.use(
     const { status, data } = error.response;
     const extra = { code: data?.code, errors: data?.errors };
     if (status === 401) {
+      // Notify AuthContext (or any registered handler) so the session is
+      // cleared immediately — the user is redirected to login rather than
+      // left in a broken "authenticated but all APIs failing" state.
+      _onUnauthorized?.();
       return Promise.reject(createApiError(ERROR_TYPES.UNAUTHORIZED, data?.message, error, extra));
     }
     if (status >= 500) {

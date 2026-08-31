@@ -53,7 +53,9 @@ export const AssessmentProvider = ({ children }) => {
         // AuthContext so RootNavigator routes away from this flow.
         setIsBaselineComplete(true);
       } else {
-        const nextId = data.nextEmotion?.id;
+        // `nextEmotion` is null for brand-new users (no progress record
+        // yet) — default to emotion 0 so the baseline starts cleanly.
+        const nextId = data.nextEmotion?.id ?? null;
         const resumeIndex = nextId ? EMOTIONS.findIndex((emotion) => emotion.id === nextId) : 0;
         setCurrentIndex(resumeIndex >= 0 ? resumeIndex : 0);
       }
