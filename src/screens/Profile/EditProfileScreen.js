@@ -52,7 +52,7 @@ const SelectField = ({ label, value, options, onSelect, formatOption = (option) 
         accessibilityRole="button"
         accessibilityLabel={label}
         className="flex-row items-center justify-between rounded-xl border border-border bg-white px-4 py-3.5">
-        <Text className="text-base text-text">{value ? formatOption(value) : `Select ${label}`}</Text>
+        <Text className="flex-1 mr-2 text-base text-text">{value ? formatOption(value) : `Select ${label}`}</Text>
         <Icon name={ICONS.CHEVRON_RIGHT} size={16} color={COLORS.gray400} />
       </TouchableOpacity>
 
@@ -65,7 +65,7 @@ const SelectField = ({ label, value, options, onSelect, formatOption = (option) 
               setVisible(false);
             }}
             className="flex-row items-center justify-between py-3">
-            <Text className={`text-base ${option === value ? 'font-semibold text-primary' : 'text-text'}`}>
+            <Text className={`flex-1 mr-2 text-base ${option === value ? 'font-semibold text-primary' : 'text-text'}`}>
               {formatOption(option)}
             </Text>
             {option === value ? <Icon name={ICONS.COMPLETE} size={18} color={COLORS.primary} /> : null}
@@ -92,7 +92,7 @@ const DateField = ({ label, value, onChange }) => {
         accessibilityRole="button"
         accessibilityLabel={label}
         className="flex-row items-center justify-between rounded-xl border border-border bg-white px-4 py-3.5">
-        <Text className="text-base text-text">{value || 'YYYY-MM-DD'}</Text>
+        <Text className="flex-1 mr-2 text-base text-text">{value || 'YYYY-MM-DD'}</Text>
         <Icon name={ICONS.CHECK_IN} size={16} color={COLORS.gray400} />
       </TouchableOpacity>
 
