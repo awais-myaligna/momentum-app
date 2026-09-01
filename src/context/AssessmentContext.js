@@ -29,6 +29,13 @@ export const AssessmentProvider = ({ children }) => {
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
   const [hasProgressError, setHasProgressError] = useState(false);
   const [isBaselineComplete, setIsBaselineComplete] = useState(false);
+  // Separate flag: true only when the backend already had all 12 emotions
+  // scored when we fetched progress on mount (e.g. app restarted after the
+  // last emotion was finished). This is the edge-case redirect trigger used
+  // by AssessmentGate — distinct from isBaselineComplete which is set when
+  // the user *just now* finished the 12th emotion in this session and needs
+  // to be shown BaselineCompletionScreen before redirecting to Main.
+  const [isBaselineCompleteOnResume, setIsBaselineCompleteOnResume] = useState(false);
 
   const currentEmotion = EMOTIONS[currentIndex];
   const isLastEmotion = currentIndex === EMOTIONS.length - 1;
@@ -49,9 +56,10 @@ export const AssessmentProvider = ({ children }) => {
       setAnswers(completedAnswers);
 
       if (data.completed) {
-        // Nothing left to resume into — AssessmentNavigator syncs
-        // AuthContext so RootNavigator routes away from this flow.
-        setIsBaselineComplete(true);
+        // App was reopened after all 12 emotions were already recorded —
+        // nothing to resume into. AssessmentGate watches this flag and calls
+        // completeBaseline() immediately so RootNavigator routes to Main.
+        setIsBaselineCompleteOnResume(true);
       } else {
         // `nextEmotion` is null for brand-new users (no progress record
         // yet) — default to emotion 0 so the baseline starts cleanly.
@@ -102,6 +110,7 @@ export const AssessmentProvider = ({ children }) => {
       isLoadingProgress,
       hasProgressError,
       isBaselineComplete,
+      isBaselineCompleteOnResume,
       loadProgress,
       applyScoreResult,
     }),
@@ -114,6 +123,7 @@ export const AssessmentProvider = ({ children }) => {
       isLoadingProgress,
       hasProgressError,
       isBaselineComplete,
+      isBaselineCompleteOnResume,
       loadProgress,
       applyScoreResult,
     ]

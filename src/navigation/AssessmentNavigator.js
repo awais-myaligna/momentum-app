@@ -23,21 +23,25 @@ const Stack = createNativeStackNavigator();
 // which emotion to resume from, so the user never briefly sees — or starts
 // a voice session for — the wrong emotion.
 const AssessmentGate = () => {
-  const { isLoadingProgress, hasProgressError, loadProgress, isBaselineComplete } = useAssessment();
+  const { isLoadingProgress, hasProgressError, loadProgress, isBaselineCompleteOnResume } = useAssessment();
   const { completeBaseline } = useAuth();
 
   useEffect(() => {
-    // Edge case: the backend already has all 12 emotions recorded (e.g. the
-    // last one was completed just before the app closed, before this
-    // device's cached completion flag caught up). Sync AuthContext so
-    // RootNavigator routes away from the assessment flow instead of
-    // starting a 13th conversation with nothing left to score.
-    if (isBaselineComplete) {
+    // Edge case only: the backend already had all 12 emotions recorded when
+    // the app (re)opened — nothing to resume into. Call completeBaseline()
+    // so RootNavigator routes straight to Main.
+    //
+    // The in-session finish (user just answered the 12th emotion) is NOT
+    // handled here: ConversationScreen navigates to BaselineCompletionScreen
+    // first, and that screen calls completeBaseline() on its Continue button.
+    // Calling it here for that case would unmount the entire AssessmentNavigator
+    // before BaselineCompletionScreen ever renders.
+    if (isBaselineCompleteOnResume) {
       completeBaseline();
     }
-  }, [isBaselineComplete, completeBaseline]);
+  }, [isBaselineCompleteOnResume, completeBaseline]);
 
-  if (isLoadingProgress || isBaselineComplete) {
+  if (isLoadingProgress || isBaselineCompleteOnResume) {
     return (
       <ScreenWrapper>
         <Loading fullScreen label="Loading your check-in…" />

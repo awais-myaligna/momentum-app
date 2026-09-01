@@ -182,6 +182,7 @@ const RegisterScreen = () => {
   const [form, setForm] = useState(initialForm);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const setField = (key) => (val) => setForm((current) => ({ ...current, [key]: val }));
@@ -203,10 +204,12 @@ const RegisterScreen = () => {
     const error = validate();
     if (error) {
       setApiError(error);
+      setFieldErrors({});
       return;
     }
 
     setApiError('');
+    setFieldErrors({});
     setLoading(true);
     try {
       const result = await register({
@@ -224,6 +227,21 @@ const RegisterScreen = () => {
       });
       showToast(result?.message || 'Account created successfully', { type: 'success' });
     } catch (error) {
+      // Parse field-level errors from the backend { errors: { field: ["msg"] } }
+      const backendErrors = error?.errors;
+      if (backendErrors && typeof backendErrors === 'object') {
+        const mapped = {};
+        Object.entries(backendErrors).forEach(([field, messages]) => {
+          mapped[field] = Array.isArray(messages) ? messages[0] : messages;
+        });
+        setFieldErrors(mapped);
+        // Show the first field error as the generic banner fallback
+        const firstMsg = Object.values(mapped)[0];
+        if (firstMsg) {
+          showToast(firstMsg, { type: 'error' });
+          return;
+        }
+      }
       const message = error?.message || 'Registration failed. Please try again.';
       setApiError(message);
       showToast(message, { type: 'error' });
@@ -280,22 +298,22 @@ const RegisterScreen = () => {
                     }}>
                     <View className="mb-4 flex-row">
                       <View className="mr-2 flex-1">
-                        <FormField label="First name *" value={form.first_name} onChangeText={setField('first_name')} autoCapitalize="words" />
+                        <FormField label="First name *" value={form.first_name} onChangeText={setField('first_name')} autoCapitalize="words" error={fieldErrors.first_name} />
                       </View>
                       <View className="ml-2 flex-1">
-                        <FormField label="Last name *" value={form.last_name} onChangeText={setField('last_name')} autoCapitalize="words" />
+                        <FormField label="Last name *" value={form.last_name} onChangeText={setField('last_name')} autoCapitalize="words" error={fieldErrors.last_name} />
                       </View>
                     </View>
 
-                    <FormField label="Nickname" value={form.nickname} onChangeText={setField('nickname')} autoCapitalize="none" />
+                    <FormField label="Nickname" value={form.nickname} onChangeText={setField('nickname')} autoCapitalize="none" error={fieldErrors.nickname} />
                     <DatePickerField label="Date of birth *" value={form.date_of_birth} onChange={setField('date_of_birth')} />
                     <DropdownField label="Gender *" value={form.gender} options={GENDERS} onSelect={setField('gender')} />
                     <DropdownField label="Default language" value={form.default_language} options={LANGUAGES} onSelect={setField('default_language')} />
                     <DropdownField label="Default agent" value={form.default_agent} options={AGENTS} onSelect={setField('default_agent')} />
-                    <FormField label="Email *" value={form.email} onChangeText={setField('email')} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
-                    <FormField label="Phone (optional)" value={form.phone} onChangeText={setField('phone')} keyboardType="phone-pad" />
-                    <FormField label="Password *" value={form.password} onChangeText={setField('password')} secureTextEntry showToggle autoComplete="password" />
-                    <FormField label="Confirm password *" value={form.confirm_password} onChangeText={setField('confirm_password')} secureTextEntry showToggle autoComplete="password" />
+                    <FormField label="Email *" value={form.email} onChangeText={setField('email')} keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={fieldErrors.email} />
+                    <FormField label="Phone (optional)" value={form.phone} onChangeText={setField('phone')} keyboardType="phone-pad" error={fieldErrors.phone} />
+                    <FormField label="Password *" value={form.password} onChangeText={setField('password')} secureTextEntry showToggle autoComplete="password" error={fieldErrors.password} />
+                    <FormField label="Confirm password *" value={form.confirm_password} onChangeText={setField('confirm_password')} secureTextEntry showToggle autoComplete="password" error={fieldErrors.password_confirmation} />
 
                     <TouchableOpacity onPress={() => setAgreeTerms((value) => !value)} className="mb-3 flex-row items-start">
                       <View
